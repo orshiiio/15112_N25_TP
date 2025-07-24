@@ -1,0 +1,150 @@
+from cmu_graphics import random
+import *
+
+
+class Cat:
+    def __init__(self, name, x, y, color, personality=None):
+        self.name = name
+        self.x = x
+        self.y = y
+        self.color = color
+        
+        # tamagotchi-style stats (0-100)
+        self.hunger = 50
+        self.happiness = 50
+        self.energy = 50
+        self.cleanliness = 50
+        
+        # animation and behavior
+        self.mood = "neutral"
+        self.animation_frame = 0
+        self.last_action_time = 0
+        self.is_sleeping = False
+        self.activity = "idle"
+        
+        # player interaction
+        self.being_petted = False
+        self.customer_satisfaction = 0
+        
+        # personality will show how quickly stats decay and how much they gain from actions
+        self.personality = personality or {
+            'hunger_rate': 1.0,      # How quickly hunger decreases
+            'energy_rate': 1.0,      # How quickly energy decreases  
+            'messy_rate': 1.0,       # How quickly cleanliness decreases
+            'social_need': 1.0,      # How much happiness is affected by neglect
+            'playfulness': 1.0,      # How much they enjoy playing
+            'sleepiness': 1.0        # How much they like to rest
+        }
+
+    def feed(self):
+        base_hunger_gain = 30
+        base_happiness_gain = 10
+        self.hunger = min(100, self.hunger + base_hunger_gain)
+        self.happiness = min(100, self.happiness + base_happiness_gain)
+        self.activity = "eating"
+        
+    def play(self):
+        if self.energy > 30:
+            base_happiness_gain = 25 * self.personality['playfulness']
+            base_energy_cost = 15
+            self.happiness = min(100, self.happiness + base_happiness_gain)
+            self.energy = max(0, self.energy - base_energy_cost)
+            self.activity = "playing"
+        
+    def clean(self):
+        base_clean_gain = 40
+        base_happiness_gain = 5
+        self.cleanliness = min(100, self.cleanliness + base_clean_gain)
+        self.happiness = min(100, self.happiness + base_happiness_gain)
+        self.activity = "cleaning"
+
+    def update_stats(self, time_multiplier=1):
+        # plan is to gradually decrease stats over time (like a real Tamagotchi)
+        # use personality to modify decay rates
+        self.hunger = max(0, self.hunger - (0.1 * self.personality['hunger_rate'] * time_multiplier))
+        self.energy = max(0, self.energy - (0.05 * self.personality['energy_rate'] * time_multiplier))
+        self.cleanliness = max(0, self.cleanliness - (0.03 * self.personality['messy_rate'] * time_multiplier))
+        
+        # happiness depends on other stats and social needs
+        if self.hunger < 20 or self.energy < 20 or self.cleanliness < 20:
+            self.happiness = max(0, self.happiness - (0.15 * self.personality['social_need'] * time_multiplier))
+        elif self.hunger > 80 and self.energy > 80 and self.cleanliness > 80:
+            self.happiness = min(100, self.happiness + (0.05 * time_multiplier))
+        
+        # update mood based on stats
+        avg_stat = (self.hunger + self.happiness + self.energy + self.cleanliness) / 4
+        if avg_stat > 70:
+            self.mood = "happy"
+        elif avg_stat > 40:
+            self.mood = "neutral"
+        else:
+            self.mood = "sad"
+            
+        # "auto-sleep" when energy is low
+        self.is_sleeping = self.energy < 30
+
+    # haven't decided on which sprites to use yet so this will stay commented out   
+    # def draw(self, app):
+    #     self.animation_frame += 1
+    # not sure what i want to do about icons either but it'll follow some sort of structure as i've outlined below
+    # personality_icon = ""
+    #     if self.personality['playfulness'] > 1.2:
+    #         personality_icon = "🎾"  
+    #     elif self.personality['sleepiness'] > 1.2:
+    #         personality_icon = "😴"  
+    #     elif self.personality['social_need'] > 1.2:
+    #         personality_icon = "💕"  
+    #     elif self.personality['messy_rate'] < 0.8:
+    #         personality_icon = "✨" 
+
+def create_cat_personalities():
+    # an attempt to create different personality types for different cats
+    personalities = {
+        'lazy': {
+            'hunger_rate': 0.8, 'energy_rate': 1.5, 'messy_rate': 1.2,
+            'social_need': 0.8, 'playfulness': 0.6, 'sleepiness': 1.5
+        },
+        'energetic': {
+            'hunger_rate': 1.3, 'energy_rate': 0.7, 'messy_rate': 1.3,
+            'social_need': 1.2, 'playfulness': 1.8, 'sleepiness': 0.6
+        },
+        'clean': {
+            'hunger_rate': 1.0, 'energy_rate': 1.0, 'messy_rate': 0.5,
+            'social_need': 1.0, 'playfulness': 1.0, 'sleepiness': 1.0
+        },
+        'social': {
+            'hunger_rate': 1.0, 'energy_rate': 1.0, 'messy_rate': 1.0,
+            'social_need': 1.8, 'playfulness': 1.3, 'sleepiness': 0.8
+        },
+        'independent': {
+            'hunger_rate': 0.9, 'energy_rate': 0.9, 'messy_rate': 0.9,
+            'social_need': 0.5, 'playfulness': 0.8, 'sleepiness': 1.1
+        }
+    }
+    return personalities
+
+def onAppStart(app):
+    app.width = 800
+    app.height = 600
+    app.step_counter = 0
+    app.game_time = 0
+    app.selected_cat = None
+
+    app.cats = [
+            Cat("churrio", 120, 180, personalities['energetic']),   # orange energetic cat
+            Cat("beepaw", 280, 180, personalities['independent']),    # grey independent cat  
+            Cat("meeple", 440, 180, personalities['clean']),     # white clean cat
+            Cat("elwin", 600, 320, personalities['social']),       # Cream social cat
+        ]
+
+def onMousePress(app, mouseX, mouseY):
+    # Check if clicking on a cat
+    for cat in app.cats:
+        distance = ((mouseX - cat.x) ** 2 + (mouseY - cat.y) ** 2) ** 0.5
+        if distance <= 30:
+            app.selected_cat = cat
+            return
+
+def main():
+    runApp()
+    
