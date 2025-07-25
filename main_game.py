@@ -1,4 +1,4 @@
-from cmu_graphics import random
+from cmu_graphics import *
 import math
 import time 
 
@@ -130,12 +130,12 @@ def onAppStart(app):
     app.game_time = 0
     app.selected_cat = None
 
-    app.cats = [
-            Cat("churrio", 120, 180, personalities['energetic']),   # orange energetic cat
-            Cat("beepaw", 280, 180, personalities['independent']),    # grey independent cat  
-            Cat("meeple", 440, 180, personalities['clean']),     # white clean cat
-            Cat("elwin", 600, 320, personalities['social']),       # cream social cat
-        ]
+    # app.cats = [
+    #         Cat("churrio", 120, 180, personalities['energetic']),   # orange energetic cat
+    #         Cat("beepaw", 280, 180, personalities['independent']),    # grey independent cat  
+    #         Cat("meeple", 440, 180, personalities['clean']),     # white clean cat
+    #         Cat("elwin", 600, 320, personalities['social']),       # cream social cat
+    #     ]
 
 def onMousePress(app, mouseX, mouseY):
     # check if clicking on a cat
@@ -150,5 +150,5 @@ def redrawAll(app):
 
 def main():
     runApp()
-
-cmu_graphics.run()
+    
+main()
