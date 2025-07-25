@@ -1,6 +1,6 @@
 from cmu_graphics import random
-import *
-
+import math
+import time 
 
 class Cat:
     def __init__(self, name, x, y, color, personality=None):
@@ -28,12 +28,12 @@ class Cat:
         
         # personality will show how quickly stats decay and how much they gain from actions
         self.personality = personality or {
-            'hunger_rate': 1.0,      # How quickly hunger decreases
-            'energy_rate': 1.0,      # How quickly energy decreases  
-            'messy_rate': 1.0,       # How quickly cleanliness decreases
-            'social_need': 1.0,      # How much happiness is affected by neglect
-            'playfulness': 1.0,      # How much they enjoy playing
-            'sleepiness': 1.0        # How much they like to rest
+            'hunger_rate': 1.0,      # how quickly hunger decreases
+            'energy_rate': 1.0,      # how quickly energy decreases  
+            'messy_rate': 1.0,       # how quickly cleanliness decreases
+            'social_need': 1.0,      # how much happiness is affected by neglect
+            'playfulness': 1.0,      # how much they enjoy playing
+            'sleepiness': 1.0        # how much they like to rest
         }
 
     def feed(self):
@@ -59,7 +59,7 @@ class Cat:
         self.activity = "cleaning"
 
     def update_stats(self, time_multiplier=1):
-        # plan is to gradually decrease stats over time (like a real Tamagotchi)
+        # plan is to gradually decrease stats over time (like a real tamagotchi)
         # use personality to modify decay rates
         self.hunger = max(0, self.hunger - (0.1 * self.personality['hunger_rate'] * time_multiplier))
         self.energy = max(0, self.energy - (0.05 * self.personality['energy_rate'] * time_multiplier))
@@ -124,8 +124,8 @@ def create_cat_personalities():
     return personalities
 
 def onAppStart(app):
-    app.width = 800
-    app.height = 600
+    app.width = 512
+    app.height = 512
     app.step_counter = 0
     app.game_time = 0
     app.selected_cat = None
@@ -134,17 +134,21 @@ def onAppStart(app):
             Cat("churrio", 120, 180, personalities['energetic']),   # orange energetic cat
             Cat("beepaw", 280, 180, personalities['independent']),    # grey independent cat  
             Cat("meeple", 440, 180, personalities['clean']),     # white clean cat
-            Cat("elwin", 600, 320, personalities['social']),       # Cream social cat
+            Cat("elwin", 600, 320, personalities['social']),       # cream social cat
         ]
 
 def onMousePress(app, mouseX, mouseY):
-    # Check if clicking on a cat
+    # check if clicking on a cat
     for cat in app.cats:
         distance = ((mouseX - cat.x) ** 2 + (mouseY - cat.y) ** 2) ** 0.5
         if distance <= 30:
             app.selected_cat = cat
             return
 
+def redrawAll(app):
+    pass
+
 def main():
     runApp()
-    
+
+cmu_graphics.run()
