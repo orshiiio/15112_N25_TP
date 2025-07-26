@@ -1,7 +1,5 @@
-# 15112_N25_TP
-Term Project: Virtual Cat Cafe Type Game
-# 🐈 Virtual Cat Cafe  
-A cozy and interactive web-based simulation where users can manage a virtual cat cafe—adopt cats, design cafe layouts, serve customers, and keep everyone happy.
+# 🐈 15112_N25_TP: Virtual Cat Cafe  
+A cozy and interactive web-based simulation where users can manage a virtual cat cafe—adopt cats, play with them, and keep everyone happy.
 ---
 ## ✨ Features  
 
