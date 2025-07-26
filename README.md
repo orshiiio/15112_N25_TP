@@ -7,7 +7,7 @@ A cozy and interactive web-based simulation where users can manage a virtual cat
 
 ### ☕ Cafe Simulation  
 - **Adopt & Manage Cats**: Choose from a variety of cats, each with their own personalities and preferences.  
-- **Needs-Based System**: Balance cat hunger, playfulness, and rest while managing customer satisfaction.
+- **Needs-Based System**: Balance cat hunger, playfulness, and rest while managing satisfaction.
 
 ### 🧠 Gameplay & Mechanics  
 - **Behavior Engine**: Cat behaviors driven by internal state machines (e.g. tired, hungry, playful).  
@@ -53,21 +53,7 @@ _This section is updated daily to track edits and progress._
 - Python 3.10+  
 
 ### 🔧 Installation  
-Clone the repository:
-\`\`\`bash
-git clone <repository-url>
-cd virtual-cat-cafe
-\`\`\`
-Install required dependencies (if applicable):
-\`\`\`bash
-pip install pygame
-\`\`\`
-
-Run the game:
-\`\`\`bash
-python src/main.py
-\`\`\`
-
+- Details TBD
 ---
 
 ## 📱 Usage Guide  
