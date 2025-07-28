@@ -1,6 +1,34 @@
 from cmu_graphics import *
 import math
-import time 
+import time
+import random
+try:
+    import kaomoji
+    KAOMOJI_AVAILABLE = True
+except ImportError:
+    KAOMOJI_AVAILABLE = False
+
+# complex Unicode kaomoji (ideal)
+HAPPY_KAOMOJI = "(=^·ω·^=)"
+SAD_KAOMOJI = "( ˘︹˘ )"
+NEUTRAL_KAOMOJI = "(•-•)"
+EATING_KAOMOJI = "(*˘ڡ˘*)"
+EXCITED_KAOMOJI = "\(^Д^)/"
+SLEEPING_KAOMOJI = "(˘o˘) z z Z"
+SPARKLES_KAOMOJI = "*,+.~"
+
+# fallback ASCII kaomoji if Unicode doesn't work
+HAPPY_KAOMOJI_SIMPLE = "(^_^)"
+SAD_KAOMOJI_SIMPLE = "(-_-)"
+NEUTRAL_KAOMOJI_SIMPLE = "(o_o)"
+EATING_KAOMOJI_SIMPLE = "(nom)"
+EXCITED_KAOMOJI_SIMPLE = "\\o/"
+SLEEPING_KAOMOJI_SIMPLE = "(zzz)"
+SPARKLES_KAOMOJI_SIMPLE = "(*)"
+
+# font options to try for better Unicode support
+UNICODE_FONTS = ['arial', 'helvetica', 'times', 'courier', 'verdana']
+DEFAULT_FONT = 'monospace'
 
 class Cat:
     def __init__(self, name, x, y, personality=None):
@@ -9,8 +37,8 @@ class Cat:
         self.y = y
         
         # store last valid position for placement restrictions
-        self.last_valid_x = x
-        self.last_valid_y = y
+        self.lastValidX = x
+        self.lastValidY = y
         
         # tamagotchi-style stats (0-100)
         self.hunger = 50
@@ -20,87 +48,188 @@ class Cat:
         
         # animation and behavior
         self.mood = "neutral"
-        self.animation_frame = 0
-        self.last_action_time = 0
-        self.is_sleeping = False
+        self.animationFrame = 0
+        self.lastActionTime = 0
+        self.isSleeping = False
         self.activity = "idle"
         
         # player interaction
-        self.being_petted = False
-        self.customer_satisfaction = 0
+        self.beingPetted = False
+        self.customerSatisfaction = 0
         
         # dragging state
-        self.is_being_dragged = False
-        self.drag_offset_x = 0
-        self.drag_offset_y = 0
+        self.isBeingDragged = False
+        self.dragOffsetX = 0
+        self.dragOffsetY = 0
         
-        self.current_frame = 0
-        self.animation_speed = 12 
-        self.frame_timer = 0
+        self.currentFrame = 0
+        self.animationSpeed = 12 
+        self.frameTimer = 0
         
-        self.sprite_frames = {
+        self.spriteFrames = {
             "idle_neutral": 6,    # all cats have ~6 frames for idle neutral
             "idle_happy": 8,      # all cats have ~8 frames for idle happy
             "idle_sad": 6,        # all cats have ~6 frames for idle sad
             "sleeping": 2,        # all cats have ~2 frames for sleeping
+            "dangling": 1,        # 2 frames for dangling (frames of jumping of happy)
+            "running": 7,         # 7 frames for running animation
         }
         
         # personality 
         self.personality = personality or {
-            'hunger_rate': 1.0,
-            'energy_rate': 1.0,
-            'messy_rate': 1.0,
-            'social_need': 1.0,
+            'hungerRate': 1.0,
+            'energyRate': 1.0,
+            'messyRate': 1.0,
+            'socialNeed': 1.0,
             'playfulness': 1.0,
             'sleepiness': 1.0
         }
 
-        self.is_selected = False
+        self.isSelected = False
+        
+        # Running behavior
+        self.isRunning = False
+        self.runTimer = 0
+        self.runDuration = 0
+        self.runTargetX = 0
+        self.runTargetY = 0
+        self.runSpeed = 1.2
+        self.facingLeft = False
 
     def feed(self):
-        self.hunger = min(100, self.hunger + 30)
-        self.happiness = min(100, self.happiness + 10)
+        self.hunger = min(100, self.hunger + 15)
+        self.happiness = min(100, self.happiness + 5)
         self.activity = "eating"
         
     def play(self):
-        if self.energy > 30:
-            self.happiness = min(100, self.happiness + 25 * self.personality['playfulness'])
-            self.energy = max(0, self.energy - 15)
+        if self.energy > 20:
+            self.happiness = min(100, self.happiness + 12 * self.personality['playfulness'])
+            self.energy = max(0, self.energy - 8)
             self.activity = "playing"
         
     def clean(self):
-        self.cleanliness = min(100, self.cleanliness + 40)
-        self.happiness = min(100, self.happiness + 5)
+        self.cleanliness = min(100, self.cleanliness + 20)
+        self.happiness = min(100, self.happiness + 3)
         self.activity = "cleaning"
 
-    def start_drag(self, mouse_x, mouse_y):
-        self.is_being_dragged = True
-        self.drag_offset_x = mouse_x - self.x
-        self.drag_offset_y = mouse_y - self.y
-        self.happiness = max(0, self.happiness - 2)
+    def startDrag(self, mouseX, mouseY):
+        self.isBeingDragged = True
+        self.dragOffsetX = mouseX - self.x
+        self.dragOffsetY = mouseY - self.y
+        self.happiness = max(0, self.happiness - 1)
 
-    def update_drag_position(self, mouse_x, mouse_y):
-        if self.is_being_dragged:
-            self.x = mouse_x - self.drag_offset_x
-            self.y = mouse_y - self.drag_offset_y
+    def updateDragPosition(self, mouseX, mouseY):
+        if self.isBeingDragged:
+            self.x = mouseX - self.dragOffsetX
+            self.y = mouseY - self.dragOffsetY
 
-    def stop_drag(self):
+    def updateRunning(self):
+        """Handle random running behavior"""
+        if not self.isBeingDragged and not self.isSleeping and not self.isRunning:
+            # only start running if cat is not sleeping and not already running
+            # much lower chance 
+            chance = random.randint(1, 1000)  # Changed from 100 to 1000
+            threshold = 3 * self.personality['playfulness']  # Changed from 20 to 3
+            if chance < threshold:
+                self.startRunning()
+        
+        # if currently running
+        if self.isRunning:
+            self.runTimer += 1
+            
+            # move towards target
+            dx = self.runTargetX - self.x
+            dy = self.runTargetY - self.y
+            distance = (dx**2 + dy**2)**0.5
+            
+            # always face right when running (remove direction tracking)
+            self.facingLeft = False
+            
+            if distance > 2:  # even smaller threshold for ultra-smooth stopping
+                # very smooth movement towards target
+                moveX = (dx / distance) * self.runSpeed
+                moveY = (dy / distance) * self.runSpeed
+                
+                # stronger easing when close to target for smoother approach
+                if distance < 80:
+                    easeFactor = distance / 80
+                    moveX *= easeFactor * 0.7  # extra smoothing factor
+                    moveY *= easeFactor * 0.7
+                
+                self.x += moveX
+                self.y += moveY
+            else:
+                self.stopRunning()
+            
+            # stop running after duration
+            if self.runTimer > self.runDuration:
+                self.stopRunning()
+
+    def startRunning(self):
+        self.isRunning = True
+        self.runTimer = 0
+        self.runDuration = random.randint(90, 150)  # run for 3-5 seconds (30 fps = 90-150 frames)
+        
+        # pick a random valid target position that's to the RIGHT of current position
+        attempts = 0
+        while attempts < 10:  # try to find valid position
+            minX = max(100, int(self.x + 50))
+            maxX = 1700
+            if minX < maxX:
+                targetX = random.randint(max(100, int(self.x + 50)), 1800)  # only targets to the right
+                targetY = random.randint(100, 900)
+                if isValidPosition(targetX, targetY):
+                    self.runTargetX = targetX
+                    self.runTargetY = targetY
+                    break
+                attempts += 1
+        
+        # if no valid position found to the right, pick any valid position
+        if attempts >= 10:
+            attempts = 0
+            while attempts < 10:
+                targetX = random.randint(100, 1800)
+                targetY = random.randint(100, 900)
+                if isValidPosition(targetX, targetY):
+                    self.runTargetX = targetX
+                    self.runTargetY = targetY
+                    break
+                attempts += 1
+        
+        # boost happiness slightly when running
+        if self.personality['playfulness'] > 1.0:
+            self.happiness = min(100, self.happiness + 2)
+        
+        self.activity = "running"
+
+    def stopRunning(self):
+        self.isRunning = False
+        self.runTimer = 0
+        self.activity = "idle"
+
+    def stopDrag(self):
         # when stopping drag, check if position is valid:
         if isValidPosition(self.x, self.y):
             # accept new position
-            self.last_valid_x = self.x
-            self.last_valid_y = self.y
+            self.lastValidX = self.x
+            self.lastValidY = self.y
         else:
             # revert to last valid position
-            self.x = self.last_valid_x
-            self.y = self.last_valid_y
+            self.x = self.lastValidX
+            self.y = self.lastValidY
         
-        self.is_being_dragged = False
-        self.happiness = min(100, self.happiness + 5)
+        self.isBeingDragged = False
+        self.happiness = min(100, self.happiness + 2)
 
-    def get_current_animation_state(self):
-        # check if sleeping first
-        if self.is_sleeping:
+    def getCurrentAnimationState(self):
+        # check if being dragged first - use dangling animation
+        if self.isBeingDragged:
+            return "dangling"
+        # check if running (this should come BEFORE sleeping check)
+        elif self.isRunning:
+            return "running"
+        # check if sleeping (only if not running)
+        elif self.isSleeping and not self.isRunning:
             return "sleeping"
         # otherwise use idle animations based on mood
         elif self.mood == "happy":
@@ -110,104 +239,115 @@ class Cat:
         else:
             return "idle_neutral"
 
-    def update_animation(self):
-        self.frame_timer += 1
+    def updateAnimation(self):
+        self.frameTimer += 1
         
         # different animation speeds for different states
-        current_state = self.get_current_animation_state()
-        if current_state == "sleeping":
-            animation_speed = 20  # slower for peaceful sleeping
-        elif current_state == "idle_happy":
-            animation_speed = 8   # faster for happy/energetic cats
+        currentState = self.getCurrentAnimationState()
+        if currentState == "dangling":
+            animationSpeed = 15  # moderate speed for dangling animation
+        elif currentState == "running":
+            animationSpeed = 5  # faster running 
+        elif currentState == "sleeping":
+            animationSpeed = 20  # slower for peaceful sleeping
+        elif currentState == "idle_happy":
+            animationSpeed = 8   # faster for happy/energetic cats
         else:
-            animation_speed = self.animation_speed  # normal speed for neutral/sad
+            animationSpeed = self.animationSpeed  # normal-ish speed for neutral/sad
             
-        if self.frame_timer >= animation_speed:
-            self.frame_timer = 0
+        if self.frameTimer >= animationSpeed:
+            self.frameTimer = 0
             
             # get current animation state and frame count
-            max_frames = self.sprite_frames.get(current_state, 1)
+            maxFrames = self.spriteFrames.get(currentState, 1)
             
             # cycle through frames
-            self.current_frame = (self.current_frame + 1) % max_frames
+            self.currentFrame = (self.currentFrame + 1) % maxFrames
 
-    def get_sprite_path(self):
-        current_state = self.get_current_animation_state()
-        max_frames = self.sprite_frames.get(current_state, 1)
+    def getSpritePath(self):
+        currentState = self.getCurrentAnimationState()
+        maxFrames = self.spriteFrames.get(currentState, 1)
         
-        # only use frame numbers if we have multiple frames
-        if max_frames > 1:
-            # build sprite filename: images/cats/elwin_idle_neutral_1.png
-            frame_num = self.current_frame + 1  # 1-indexed
-            sprite_filename = f"{self.name}_{current_state}_{frame_num}.png"
+        # special handling for dangling - use happy frames 3-4 [?? have to double check number but it looks right]
+        if currentState == "dangling":
+            # map dangling frames 0-1 to happy frames 3-4 [??]
+            actualFrame = self.currentFrame + 3
+            spriteFilename = f"{self.name}_idle_happy_{actualFrame}.png"
+        elif maxFrames > 1:
+            # normal multi-frame animations
+            frameNum = self.currentFrame  # Keep 0-indexed
+            spriteFilename = f"{self.name}_{currentState}_{frameNum}.png"
         else:
-            # single frame, no number: e.g. images/cats/churrio_idle_happy.png
-            sprite_filename = f"{self.name}_{current_state}.png"
+            # single frame animations
+            spriteFilename = f"{self.name}_{currentState}.png"
             
-        return f"images/cats/{sprite_filename}"
+        return f"images/cats/{spriteFilename}"
 
-    def update_stats(self, time_multiplier=1):
-        self.hunger = max(0, self.hunger - (0.1 * self.personality['hunger_rate'] * time_multiplier))
-        self.energy = max(0, self.energy - (0.05 * self.personality['energy_rate'] * time_multiplier))
-        self.cleanliness = max(0, self.cleanliness - (0.03 * self.personality['messy_rate'] * time_multiplier))
+    def updateStats(self, timeMultiplier=1):
+        self.hunger = max(0, self.hunger - (0.1 * self.personality['hungerRate'] * timeMultiplier))
+        self.energy = max(0, self.energy - (0.05 * self.personality['energyRate'] * timeMultiplier))
+        self.cleanliness = max(0, self.cleanliness - (0.03 * self.personality['messyRate'] * timeMultiplier))
 
         if self.hunger < 20 or self.energy < 20 or self.cleanliness < 20:
-            self.happiness = max(0, self.happiness - (0.15 * self.personality['social_need'] * time_multiplier))
+            self.happiness = max(0, self.happiness - (0.15 * self.personality['socialNeed'] * timeMultiplier))
         elif self.hunger > 80 and self.energy > 80 and self.cleanliness > 80:
-            self.happiness = min(100, self.happiness + (0.05 * time_multiplier))
+            self.happiness = min(100, self.happiness + (0.05 * timeMultiplier))
 
-        avg_stat = (self.hunger + self.happiness + self.energy + self.cleanliness) / 4
-        if avg_stat > 70:
+        avgStat = (self.hunger + self.happiness + self.energy + self.cleanliness) / 4
+        if avgStat > 70:
             self.mood = "happy"
-        elif avg_stat > 40:
+        elif avgStat > 40:
             self.mood = "neutral"
         else:
             self.mood = "sad"
 
-        self.is_sleeping = self.energy < 30
+        self.isSleeping = self.energy < 30
 
     def draw(self, app):
-        self.animation_frame += 1
-        self.update_animation()
+        self.animationFrame += 1
+        self.updateAnimation()
+        self.updateRunning()  # Add running behavior
 
-        sprite_loaded = False
+        spriteLoaded = False
 
         try:
-            sprite_path = self.get_sprite_path()
-            drawImage(sprite_path, self.x, self.y, align='center', width=80, height=80)
-            sprite_loaded = True
+            spritePath = self.getSpritePath()
+            # always draw sprites normally (facing right) since cats only run right
+            drawImage(spritePath, self.x, self.y, align='center', width=80, height=80)
+            spriteLoaded = True
+                
         except Exception as e:
             # debug: show what file it tried to load (only for elwin for now)
-            if self.name == "elwin" and not sprite_loaded:
-                attempted_path = self.get_sprite_path()
-                print(f"Failed to load: {attempted_path}")  # This will print to console
+            if self.name == "elwin" and not spriteLoaded:
+                attemptedPath = self.getSpritePath()
+                print(f"Failed to load: {attemptedPath}") 
             # fallback to old single sprite system
             try:
-                if self.is_sleeping:
-                    sprite_path = f"images/cats/{self.name}_sleeping.png"
+                if self.isSleeping:
+                    spritePath = f"images/cats/{self.name}_sleeping.png"
                 else:
-                    sprite_path = f"images/cats/{self.name}_{self.mood}.png"
+                    spritePath = f"images/cats/{self.name}_{self.mood}.png"
 
-                drawImage(sprite_path, self.x, self.y, align='center', width=80, height=80)
-                sprite_loaded = True
+                drawImage(spritePath, self.x, self.y, align='center', width=80, height=80)
+                spriteLoaded = True
             except:
                 # final fallback to basic cat sprite
                 try:
-                    sprite_path = f"images/cats/{self.name}.png"
-                    drawImage(sprite_path, self.x, self.y, align='center', width=80, height=80)
-                    sprite_loaded = True
+                    spritePath = f"images/cats/{self.name}.png"
+                    drawImage(spritePath, self.x, self.y, align='center', width=80, height=80)
+                    spriteLoaded = True
                 except:
                     pass
 
         # if no sprite loaded, show placeholder
-        if not sprite_loaded:
-            placeholder_colors = {
+        if not spriteLoaded:
+            placeholderColors = {
                 'churrio': rgb(255, 165, 0),
                 'beepaw': rgb(128, 128, 128),
                 'meeple': rgb(255, 255, 255),
                 'elwin': rgb(255, 228, 196)
             }
-            color = placeholder_colors.get(self.name, rgb(200, 200, 200))
+            color = placeholderColors.get(self.name, rgb(200, 200, 200))
 
             drawRect(self.x - 40, self.y - 40, 80, 80, fill=color, border='black', 
                      borderWidth=2)
@@ -215,84 +355,111 @@ class Cat:
             drawLabel(self.name, self.x, self.y + 8, size=12, font='monospace')
             
             # show current animation state and frame for debugging
-            current_state = self.get_current_animation_state()
-            max_frames = self.sprite_frames.get(current_state, 1)
-            if max_frames > 1:
-                frame_info = f"{current_state}_f{self.current_frame + 1}/{max_frames}"
+            currentState = self.getCurrentAnimationState()
+            maxFrames = self.spriteFrames.get(currentState, 1)
+            if maxFrames > 1:
+                frameInfo = f"{currentState}_f{self.currentFrame + 1}/{maxFrames}"
             else:
-                frame_info = f"{current_state}"
-            drawLabel(frame_info, self.x, self.y + 25, 
+                frameInfo = f"{currentState}"
+            drawLabel(frameInfo, self.x, self.y + 25, 
                      size=9, font='monospace')
 
-        if self.is_being_dragged:
+        if self.isBeingDragged:
             drawCircle(self.x, self.y + 5, 45, fill='black', opacity=20)
 
         # emotion bubble logic
-        emotion_path = None
+        emotionPath = None
 
-        if self.is_being_dragged:
-            emotion_path = "images/emotions/surprised.png"
+        if self.isBeingDragged:
+            emotionPath = "images/emotions/surprised.png"
         elif self.hunger < 25:
-            emotion_path = "images/emotions/confused.png"
+            emotionPath = "images/emotions/confused.png"
         elif self.cleanliness < 25:
-            emotion_path = "images/emotions/sad.png"
+            emotionPath = "images/emotions/sad.png"
         elif self.energy < 20:
-            emotion_path = "images/emotions/neutral.png"
+            emotionPath = "images/emotions/neutral.png"
         elif self.activity == "eating":
-            emotion_path = "images/emotions/content.png"
+            emotionPath = "images/emotions/content.png"
         elif self.activity == "playing":
-            emotion_path = "images/emotions/wow.png"
+            emotionPath = "images/emotions/wow.png"
         elif self.activity == "cleaning":
-            emotion_path = "images/emotions/neutral.png"
-        elif self.is_sleeping:
-            emotion_path = "images/emotions/content.png"
+            emotionPath = "images/emotions/neutral.png"
+        elif self.isSleeping:
+            emotionPath = "images/emotions/content.png"
         elif self.mood == "happy":
-            if (self.animation_frame // 60) % 2 == 0:
-                emotion_path = "images/emotions/happy.png"
+            if (self.animationFrame // 60) % 2 == 0:
+                emotionPath = "images/emotions/happy.png"
             else:
-                emotion_path = "images/emotions/happy2.png"
+                emotionPath = "images/emotions/happy2.png"
         elif self.mood == "sad":
-            emotion_path = "images/emotions/sad.png"
-        elif self.personality['social_need'] > 1.2 and self.happiness < 60:
-            emotion_path = "images/emotions/meow.png"
+            emotionPath = "images/emotions/sad.png"
+        elif self.personality['socialNeed'] > 1.2 and self.happiness < 60:
+            emotionPath = "images/emotions/meow.png"
         else:
-            emotion_path = "images/emotions/neutral.png"
+            emotionPath = "images/emotions/neutral.png"
 
-        bubble_x = self.x + 25
-        bubble_y = self.y - 35
+        bubbleX = self.x + 25
+        bubbleY = self.y - 35
 
-        if emotion_path:
+        if emotionPath:
             try:
-                drawImage(emotion_path, bubble_x, bubble_y, align='center', width=50, height=50)
+                drawImage(emotionPath, bubbleX, bubbleY, align='center', width=50, height=50)
             except:
                 try:
-                    drawImage("images/emotions/neutral.png", bubble_x, bubble_y, align='center', width=50, height=50)
+                    drawImage("images/emotions/neutral.png", bubbleX, bubbleY, align='center', width=50, height=50)
                 except:
                     pass
 
         drawLabel(self.name, self.x, self.y + 60, size=14, bold=True, fill='black', font='monospace')
 
-def create_cat_personalities():
+def drawUnicodeLabel(text, x, y, size=16, bold=False, fill='black', align='center'):
+    # i try to draw text with Unicode support by testing different font but it'll fall back to simple ASCII if Unicode fails
+    # first try with different fonts that might support Unicode better
+    for font in UNICODE_FONTS:
+        try:
+            drawLabel(text, x, y, size=size, bold=bold, fill=fill, align=align, font=font)
+            return True
+        except:
+            continue
+    
+    # if all Unicode fonts fail, try with default font
+    try:
+        drawLabel(text, x, y, size=size, bold=bold, fill=fill, align=align, font=DEFAULT_FONT)
+        return True
+    except:
+        # if even that fails, strip Unicode and use ASCII fallback
+        simple_text = text.replace(HAPPY_KAOMOJI, HAPPY_KAOMOJI_SIMPLE)
+        simple_text = simple_text.replace(SAD_KAOMOJI, SAD_KAOMOJI_SIMPLE)
+        simple_text = simple_text.replace(NEUTRAL_KAOMOJI, NEUTRAL_KAOMOJI_SIMPLE)
+        simple_text = simple_text.replace(EATING_KAOMOJI, EATING_KAOMOJI_SIMPLE)
+        simple_text = simple_text.replace(EXCITED_KAOMOJI, EXCITED_KAOMOJI_SIMPLE)
+        simple_text = simple_text.replace(SLEEPING_KAOMOJI, SLEEPING_KAOMOJI_SIMPLE)
+        simple_text = simple_text.replace(SPARKLES_KAOMOJI, SPARKLES_KAOMOJI_SIMPLE)
+        
+        drawLabel(simple_text, x, y, size=size, bold=bold, fill=fill, align=align, font=DEFAULT_FONT)
+        return False
+    
+def createCatPersonalities():
     personalities = {
         'lazy': {
-            'hunger_rate': 0.8, 'energy_rate': 1.5, 'messy_rate': 1.2,
-            'social_need': 0.8, 'playfulness': 0.6, 'sleepiness': 1.5
+            'hungerRate': 0.8, 'energyRate': 1.5, 'messyRate': 1.2,
+            'socialNeed': 0.8, 'playfulness': 0.6, 'sleepiness': 1.5
         },
         'energetic': {
-            'hunger_rate': 1.3, 'energy_rate': 0.7, 'messy_rate': 1.3,
-            'social_need': 1.2, 'playfulness': 1.8, 'sleepiness': 0.6
+            'hungerRate': 1.3, 'energyRate': 0.7, 'messyRate': 1.3,
+            'socialNeed': 1.2, 'playfulness': 1.8, 'sleepiness': 0.6
         },
         'clean': {
-            'hunger_rate': 1.0, 'energy_rate': 1.0, 'messy_rate': 0.5,
-            'social_need': 1.0, 'playfulness': 1.0, 'sleepiness': 1.0
+            'hungerRate': 1.0, 'energyRate': 1.0, 'messyRate': 0.5,
+            'socialNeed': 1.0, 'playfulness': 1.0, 'sleepiness': 1.0
         },
         'social': {
-            'hunger_rate': 1.0, 'energy_rate': 1.0, 'messy_rate': 1.0,
-            'social_need': 1.8, 'playfulness': 1.3, 'sleepiness': 0.8
+            'hungerRate': 1.0, 'energyRate': 1.0, 'messyRate': 1.0,
+            'socialNeed': 1.8, 'playfulness': 1.3, 'sleepiness': 0.8
         },
         'independent': {
-            'hunger_rate': 0.9, 'energy_rate': 0.9, 'messy_rate': 0.9,
-            'social_need': 0.5, 'playfulness': 0.8, 'sleepiness': 1.1
+            'hungerRate': 0.9, 'energyRate': 0.9, 'messyRate': 0.9,
+            'socialNeed': 0.5, 'playfulness': 0.8, 'sleepiness': 1.1
         }
     }
     return personalities
@@ -300,13 +467,13 @@ def create_cat_personalities():
 # define allowed placement area for isometric room floor
 def isValidPosition(x, y):
     # isometric room boundaries based on the floor area
-    center_x = 1000  
-    center_y = 650      
+    centerX = 1000  
+    centerY = 650      
     width = 2000    
     height = 400      
     
-    dx = x - center_x
-    dy = y - center_y
+    dx = x - centerX
+    dy = y - centerY
     
     # diamond shape condition for the floor area
     return abs(dx) / (width / 2) + abs(dy) / (height / 2) <= 1
@@ -314,102 +481,295 @@ def isValidPosition(x, y):
 def onAppStart(app):
     app.width = 1920
     app.height = 1080
-    app.step_counter = 0
-    app.game_time = 0
-    app.selected_cat = None
+    app.stepCounter = 0
+    app.gameTime = 0
+    app.selectedCat = None
     
     # dragging state
-    app.dragging_cat = None
-    app.drag_start_time = 0
-    app.mouse_x = 0
-    app.mouse_y = 0
+    app.draggingCat = None
+    app.dragStartTime = 0
+    app.mouseX = 0
+    app.mouseY = 0
     
-    personalities = create_cat_personalities()
+    # initialize paused state and sound (commented out rn)
+    app.paused = False
+    # app.sound = Sound(url) 
+
+    personalities = createCatPersonalities()
 
     app.cats = [
-        Cat("churrio", 800, 580, personalities['energetic']),
-        Cat("beepaw", 1100, 520, personalities['independent']),
-        Cat("meeple", 900, 650, personalities['clean']),
-        Cat("elwin", 1200, 600, personalities['social']),
+        Cat("churrio", 600, 600, personalities['energetic']),
+        Cat("beepaw", 1365, 510, personalities['independent']),
+        Cat("meeple", 800, 650, personalities['clean']),
+        Cat("elwin", 1000, 700, personalities['social']),
     ]
     
-    app.buttons = {
-        'feed': {'x': 100, 'y': 100, 'w': 120, 'h': 50, 'text': 'Feed Cat'},
-        'play': {'x': 240, 'y': 100, 'w': 120, 'h': 50, 'text': 'Play'},
-        'clean': {'x': 380, 'y': 100, 'w': 120, 'h': 50, 'text': 'Clean'},
+    # popup menu settings
+    app.popupWidth = 350
+    app.popupHeight = 370
+    app.popupX = 10
+    app.popupY = 10
+    
+    # initialize actionButtons to avoid AttributeError
+    app.actionButtons = {}
+
+def drawStatBar(x, y, width, height, value, maxValue, color, label):
+    # background bar
+    drawRect(x, y, width, height, fill='lightGray', border='darkGray', borderWidth=1)
+    
+    # filled portion
+    fillWidth = (value / maxValue) * width
+    drawRect(x, y, fillWidth, height, fill=color, border=None)
+    
+    # text overlay
+    drawLabel(f"{label}: {int(value)}", x + width//2, y + height//2, 
+             size=12, bold=True, fill='darkOliveGreen' if value > 50 else 'fireBrick', font='monospace')
+
+def updateActionButtons(app):
+    if app.selectedCat:
+        popupX, popupY = app.popupX, app.popupY
+        popupW, popupH = app.popupWidth, app.popupHeight
+        
+        # calculate button positions (same logic as in drawCatPopup)
+        headerHeight = 60
+        statsY = popupY + headerHeight + 20
+        statSpacing = 35
+        activityY = statsY + statSpacing * 4 + 20
+        buttonY = activityY + 60
+        buttonWidth = 80
+        buttonHeight = 40
+        buttonSpacing = 20
+        
+        totalButtonWidth = buttonWidth * 3 + buttonSpacing * 2
+        startX = popupX + (popupW - totalButtonWidth) // 2
+        
+        # close button position
+        closeX = popupX + popupW - 30
+        closeY = popupY + 30
+        
+        app.actionButtons = {
+            'feed': {'x': startX, 'y': buttonY, 'w': buttonWidth, 'h': buttonHeight},
+            'play': {'x': startX + buttonWidth + buttonSpacing, 'y': buttonY, 'w': buttonWidth, 'h': buttonHeight},
+            'clean': {'x': startX + (buttonWidth + buttonSpacing) * 2, 'y': buttonY, 'w': buttonWidth, 'h': buttonHeight},
+            'close': {'x': closeX - 15, 'y': closeY - 15, 'w': 30, 'h': 30}
+        }
+    else:
+        app.actionButtons = {}
+
+def drawCatPopup(app, cat):
+    # popup background with rounded corners effect
+    popupX, popupY = app.popupX, app.popupY
+    popupW, popupH = app.popupWidth, app.popupHeight
+    
+    # shadow effect
+    drawRect(popupX + 3, popupY + 3, popupW, popupH, fill='black', opacity=30)
+    
+    # main popup background
+    drawRect(popupX, popupY, popupW, popupH, fill='aliceBlue', border='cadetBlue', borderWidth=3)
+    
+    # header section
+    headerHeight = 60
+    drawRect(popupX, popupY, popupW, headerHeight, fill='aliceBlue', border='cadetBlue', borderWidth=2)
+    
+    # cat name
+    drawUnicodeLabel(f"{HAPPY_KAOMOJI} {cat.name.title()}", popupX + popupW//2, popupY + 20, 
+                    size=24, bold=True, fill='cadetBlue', align='center')
+
+    # close button (X)
+    closeX = popupX + popupW - 30
+    closeY = popupY + 30
+    drawCircle(closeX, closeY, 15, fill='red', border='darkRed', borderWidth=2)
+    drawLabel("×", closeX, closeY+1, size=20, bold=True, fill='white')
+
+    # mood indicator 
+    if cat.mood == "happy":
+        moodKaomoji = HAPPY_KAOMOJI
+    elif cat.mood == "sad":
+        moodKaomoji = SAD_KAOMOJI
+    else:
+        moodKaomoji = NEUTRAL_KAOMOJI
+
+    drawUnicodeLabel(f"Mood: {moodKaomoji} {cat.mood.title()}", popupX + popupW//2, popupY + 45, 
+                    size=14, bold=True, fill='cadetBlue', align='center')
+        
+    # stats section
+    statsY = popupY + headerHeight + 20
+    statHeight = 25
+    statSpacing = 35
+    
+    # stat bars with colors
+    statColors = {
+        'hunger': 'lightSalmon',
+        'happiness': 'lightPink', 
+        'energy': 'darkSeaGreen',
+        'cleanliness': 'lightSteelBlue'
     }
+    
+    drawStatBar(popupX + 20, statsY, popupW - 40, statHeight, 
+               cat.hunger, 100, statColors['hunger'], "Hunger")
+    
+    drawStatBar(popupX + 20, statsY + statSpacing, popupW - 40, statHeight,
+               cat.happiness, 100, statColors['happiness'], "Happiness")
+    
+    drawStatBar(popupX + 20, statsY + statSpacing * 2, popupW - 40, statHeight,
+               cat.energy, 100, statColors['energy'], "Energy")
+    
+    drawStatBar(popupX + 20, statsY + statSpacing * 3, popupW - 40, statHeight,
+               cat.cleanliness, 100, statColors['cleanliness'], "Cleanliness")
+    
+    # activity section
+    activityY = statsY + statSpacing * 4 + 20
+    drawRect(popupX + 10, activityY - 10, popupW - 20, 40, fill='lightYellow', 
+             border='orange', borderWidth=2)
+    
+    if cat.isSleeping:
+        activityText = f"Current Activity: Sleeping {SLEEPING_KAOMOJI}"
+    elif cat.activity == "eating":
+        activityText = f"Current Activity: Eating {EATING_KAOMOJI}"
+    elif cat.activity == "playing":
+        activityText = f"Current Activity: Playing {EXCITED_KAOMOJI}"
+    elif cat.activity == "cleaning":
+        activityText = f"Current Activity: Cleaning {SPARKLES_KAOMOJI}"
+    elif cat.activity == "running":
+        activityText = f"Current Activity: Running {EXCITED_KAOMOJI}"
+    else:
+        activityText = f"Current Activity: {cat.activity.title()}"
+    
+    drawUnicodeLabel(activityText, popupX + popupW//2, activityY + 10, 
+                    size=16, bold=True, fill='darkOrange')
+    
+    # action buttons
+    buttonY = activityY + 60
+    buttonWidth = 80
+    buttonHeight = 40
+    buttonSpacing = 20
+    
+    # calculate button positions to center them
+    totalButtonWidth = buttonWidth * 3 + buttonSpacing * 2
+    startX = popupX + (popupW - totalButtonWidth) // 2
+    
+    buttons = [
+        {'name': 'feed', 'text': f'{EATING_KAOMOJI} Feed', 'color': 'lightGreen', 'x': startX},
+        {'name': 'play', 'text': f'{EXCITED_KAOMOJI} Play', 'color': 'lightCoral', 'x': startX + buttonWidth + buttonSpacing},
+        {'name': 'clean', 'text': f'{SPARKLES_KAOMOJI} Clean', 'color': 'lightBlue', 'x': startX + (buttonWidth + buttonSpacing) * 2}
+    ]
+    
+    for button in buttons:
+        # button shadow
+        drawRect(button['x'] + 2, buttonY + 2, buttonWidth, buttonHeight, fill='gray', opacity=50)
+        
+        # main button
+        buttonColor = 'lightGray' if app.draggingCat else button['color']
+        drawRect(button['x'], buttonY, buttonWidth, buttonHeight, 
+                fill=buttonColor, border='black', borderWidth=2)
+        
+        # button text
+        drawLabel(button['text'], button['x'] + buttonWidth//2, buttonY + buttonHeight//2, 
+                 size=10, bold=True, font='monospace')
 
 def onMousePress(app, mouseX, mouseY):
-    app.mouse_x = mouseX
-    app.mouse_y = mouseY
-    
-    # first check buttons if a cat is selected
-    button_clicked = False
-    if app.selected_cat:
-        for button_name, button in app.buttons.items():
-            if (button['x'] <= mouseX <= button['x'] + button['w'] and 
-                button['y'] <= mouseY <= button['y'] + button['h']):
-                
-                if button_name == 'feed':
-                    app.selected_cat.feed()
-                elif button_name == 'play':
-                    app.selected_cat.play()
-                elif button_name == 'clean':
-                    app.selected_cat.clean()
-                button_clicked = True
-                break
-    
-    # if user clicked a button, don't do anything else
-    if button_clicked:
-        return
-    
-    # check if clicked on a cat
-    clicked_on_cat = False
+    app.mouseX = mouseX
+    app.mouseY = mouseY
+
+    # update button positions before checking clicks
+    updateActionButtons(app)
+
+    # check popup button clicks FIRST if popup is open
+    if app.selectedCat and hasattr(app, 'actionButtons'):
+        for name, b in app.actionButtons.items():
+            if b['x'] <= mouseX <= b['x'] + b['w'] and b['y'] <= mouseY <= b['y'] + b['h']:
+                if name == 'feed':
+                    app.selectedCat.feed()
+                    return  # don't process other clicks
+                elif name == 'play':
+                    app.selectedCat.play()
+                    return  # don't process other clicks
+                elif name == 'clean':
+                    app.selectedCat.clean()
+                    return  # don't process other clicks
+                elif name == 'close':
+                    # ONLY close menu when red X is clicked
+                    app.selectedCat = None
+                    app.draggingCat = None
+                    updateActionButtons(app)  # clear buttons when closing popup
+                    return  # Don't process other clicks
+        
+        # if popup is open and click is inside popup area, don't select other cats
+        popupX, popupY = app.popupX, app.popupY
+        popupW, popupH = app.popupWidth, app.popupHeight
+        if (popupX <= mouseX <= popupX + popupW and 
+            popupY <= mouseY <= popupY + popupH):
+            return  # Click was inside popup but not on a button, ignore it
+
+    # check if user clicked on a cat (works even if popup is open)
     for cat in app.cats:
-        distance = ((mouseX - cat.x) ** 2 + (mouseY - cat.y) ** 2) ** 0.5
-        if distance <= 50:  # adjusted click radius for big cats
-            app.selected_cat = cat
-            app.dragging_cat = cat
-            app.drag_start_time = app.step_counter
-            cat.start_drag(mouseX, mouseY)
-            clicked_on_cat = True
-            break
-    
-    # if clicked outside any cat and a cat was selected, deselect
-    if not clicked_on_cat and app.selected_cat is not None:
-        app.selected_cat = None
-        app.dragging_cat = None
+        dist = ((mouseX - cat.x) ** 2 + (mouseY - cat.y) ** 2) ** 0.5
+        if dist <= 50:
+            app.selectedCat = cat
+            app.draggingCat = cat
+            app.dragStartTime = app.stepCounter
+            cat.startDrag(mouseX, mouseY)
+            updateActionButtons(app)  # update buttons for new selection
+            return
 
 def onMouseDrag(app, mouseX, mouseY):
-    app.mouse_x = mouseX
-    app.mouse_y = mouseY
-    if app.dragging_cat:
-        app.dragging_cat.update_drag_position(mouseX, mouseY)
+    app.mouseX = mouseX
+    app.mouseY = mouseY
+    if app.draggingCat:
+        app.draggingCat.updateDragPosition(mouseX, mouseY)
 
 def onMouseRelease(app, mouseX, mouseY):
-    app.mouse_x = mouseX
-    app.mouse_y = mouseY
+    app.mouseX = mouseX
+    app.mouseY = mouseY
     
-    if app.dragging_cat:
-        drag_duration = app.step_counter - app.drag_start_time
+    if app.draggingCat:
+        dragDuration = app.stepCounter - app.dragStartTime
         
-        if drag_duration >= 10:
-            app.dragging_cat.x = max(100, min(app.width - 100, app.dragging_cat.x))
-            app.dragging_cat.y = max(100, min(app.height - 150, app.dragging_cat.y))
+        if dragDuration >= 10:
+            app.draggingCat.x = max(100, min(app.width - 100, app.draggingCat.x))
+            app.draggingCat.y = max(100, min(app.height - 150, app.draggingCat.y))
         
-        app.dragging_cat.stop_drag()
-        app.dragging_cat = None
+        app.draggingCat.stopDrag()
+        app.draggingCat = None
 
 def onStep(app):
-    app.step_counter += 1
-    app.game_time += 1
-    
-    if app.step_counter % 30 == 0:
+    if not app.paused:  # only update when not paused
+        app.stepCounter += 1
+        app.gameTime += 1
+        
+        if app.stepCounter % 30 == 0:
+            for cat in app.cats:
+                cat.updateStats()
+                
+                if app.stepCounter % 120 == 0:
+                    cat.activity = "idle"
+
+def onKeyPress(app, key):
+    if key == 'p':
+        app.paused = not app.paused
+        # if app.paused:
+        #     app.sound.pause()
+        # else:
+        #     app.sound.play(loop=True)
+    elif key == 'r':  # press 'R' to make Elwin run
+        elwin = None
         for cat in app.cats:
-            cat.update_stats()
-            
-            if app.step_counter % 120 == 0:
-                cat.activity = "idle"
+            if cat.name == "elwin":
+                elwin = cat
+                break
+        if elwin:
+            if not elwin.isRunning:
+                print("Forcing Elwin to run!")
+                elwin.startRunning()
+            else:
+                print("Elwin is already running!")
+        else:
+            print("Could not find Elwin!")
+    # elif key == 's':  '''Press 'S' to see all cat states'''
+    #     print("=== CAT STATUS ===")
+    #     for cat in app.cats:
+    #         print(f"{cat.name}: running={cat.isRunning}, activity={cat.activity}, playfulness={cat.personality['playfulness']}")
+    #         print(f"  Position: ({cat.x}, {cat.y}), dragged={cat.isBeingDragged}, sleeping={cat.isSleeping}")
 
 def redrawAll(app):
     drawRect(0, 0, app.width, app.height, fill=rgb(245, 245, 220))
@@ -419,43 +779,55 @@ def redrawAll(app):
     except:
         drawLabel("Background image missing: images/basic_room.png", app.width//2, 50, size=16, fill='red', font='monospace')
     
-    cats_to_draw = [cat for cat in app.cats if not cat.is_being_dragged]
-    for cat in cats_to_draw:
+    # draw cats that aren't being dragged first
+    catsToDraw = [cat for cat in app.cats if not cat.isBeingDragged]
+    for cat in catsToDraw:
         cat.draw(app)
     
-    if app.dragging_cat:
-        app.dragging_cat.draw(app)
+    # draw dragged cat on top
+    if app.draggingCat:
+        app.draggingCat.draw(app)
     
-    if app.selected_cat and not app.selected_cat.is_being_dragged:
-        drawCircle(app.selected_cat.x, app.selected_cat.y, 55, fill=None, border='grey', borderWidth=3, opacity=20)
+    # selection indicator
+    if app.selectedCat and not app.selectedCat.isBeingDragged:
+        drawCircle(app.selectedCat.x, app.selectedCat.y, 55, fill=None, border='cadetBlue', borderWidth=4, opacity=30)
     
-    if app.selected_cat:
-        cat = app.selected_cat
-        info_x, info_y = 100, 200
-        
-        drawRect(info_x - 10, info_y - 10, 400, 180, fill='white', border='black', borderWidth=2, opacity=90)
-        drawLabel(f"Selected: {cat.name}", info_x, info_y, size=20, bold=True, align='left', font='monospace')
-        
-        stats_y = info_y + 40
-        drawLabel(f"Hunger: {int(cat.hunger)}", info_x, stats_y, size=16, align='left', font='monospace')
-        drawLabel(f"Happiness: {int(cat.happiness)}", info_x + 150, stats_y, size=16, align='left', font='monospace')
-        drawLabel(f"Energy: {int(cat.energy)}", info_x, stats_y + 30, size=16, align='left', font='monospace')
-        drawLabel(f"Cleanliness: {int(cat.cleanliness)}", info_x + 150, stats_y + 30, size=16, align='left', font='monospace')
-        drawLabel(f"Mood: {cat.mood}", info_x, stats_y + 60, size=16, align='left', font='monospace')
-        drawLabel(f"Activity: {cat.activity}", info_x + 150, stats_y + 60, size=16, align='left', font='monospace')
-        
-        for button_name, button in app.buttons.items():
-            button_color = 'lightGray' if app.dragging_cat else 'lightBlue'
-            drawRect(button['x'], button['y'], button['w'], button['h'], 
-                    fill=button_color, border='black', borderWidth=2)
-            drawLabel(button['text'], button['x'] + button['w']//2, button['y'] + button['h']//2, 
-                     size=14, bold=True, font='monospace')
+    # draw the popup menu if a cat is selected
+    if app.selectedCat:
+        drawCatPopup(app, app.selectedCat)
     else:
-        drawLabel("Click on a cat to select it!", app.width//2, 100, size=24, bold=True, fill='black', font='monospace')
+        # instruction text with nice styling - using kaomoji
+        instructionY = 100
+        boxWidth = 600 
+        drawRect(app.width//2 - boxWidth//2, instructionY - 50, boxWidth, 60, 
+                fill='aliceBlue', border='cadetBlue', borderWidth=2, opacity=90)
+        drawLabel(f"{HAPPY_KAOMOJI} Click on a cat to interact! {HAPPY_KAOMOJI}", app.width//2, instructionY-30, 
+                 size=20, bold=True, fill='cadetBlue', font='monospace')
+        drawLabel("Drag them around the room", app.width//2, instructionY -5, 
+                 size=16, fill='gray', font='monospace', bold=True)
     
-    if app.dragging_cat:
-        drawLabel(f"Dragging {app.dragging_cat.name}! Release to place.", 
-                 app.width//2, app.height - 100, size=20, bold=True, fill='yellow', font='monospace')
+    if app.draggingCat:
+        # drag instruction with nice styling - using kaomoji
+        dragY = app.height - 100
+        drawRect(app.width//2 - 250, dragY - 20, 500, 60, 
+                fill='lightYellow', border='orange', borderWidth=2, opacity=90)
+        drawLabel(f"{EXCITED_KAOMOJI} Moving {app.draggingCat.name}! Release to place.", 
+                 app.width//2, dragY, size=20, bold=True, fill='darkOrange', font='monospace')
+        drawLabel("Place them on the floor area", app.width//2, dragY + 25, 
+                 size=16, fill='gray', font='monospace')
+    
+    # show pause indicator
+    if app.paused:
+        drawRect(app.width//2 - 100, 50, 200, 40, fill='black', opacity=70)
+        drawLabel("PAUSED - Press 'P' to resume", app.width//2, 70, size=16, bold=True, fill='white', font='monospace')
+    
+    controlsX = app.width - 20
+    controlsY = app.height - 30
+    drawRect(controlsX - 180, controlsY - 40, 200, 70, fill='steelBlue', opacity=60)
+    drawLabel("Extra Controls", controlsX - 80, controlsY - 30, size=18, bold=True, fill='white', font='monospace', align='center')
+    drawLabel("P = Pause/Resume", controlsX - 80, controlsY - 5, size=14, fill='black', font='monospace', align='center')
+    drawLabel("R = Make Elwin Run", controlsX - 80, controlsY + 10, size=14, fill='black', font='monospace', align='center')
+
 
 def main():
     runApp()
