@@ -155,4 +155,5 @@ This project is licensed under the MIT License. See the [LICENSE] file for detai
 - Built as a final project for Carnegie Mellon's **15-112**: Fundamentals of Programming
 - Inspired by cozy simulation games like *Neko Atsume* and *Tamagotchi*
 - Kaomoji emoticons from emojicombos.com
-- Dedicated to my friends who share my love of cats 🐾 
+- Dedicated to my friends who share my love of cats 🐾
+- Thank you to Elwin Li [@ebeetles] who helped me create a format for this README and motivated me throughout this project 
