@@ -9,6 +9,7 @@ except ImportError:
     KAOMOJI_AVAILABLE = False
 
 # complex Unicode kaomoji (ideal)
+# taken from emojicombos.com/kaomoji
 HAPPY_KAOMOJI = "(=^·ω·^=)"
 SAD_KAOMOJI = "( ˘︹˘ )"
 NEUTRAL_KAOMOJI = "(•-•)"
@@ -18,6 +19,7 @@ SLEEPING_KAOMOJI = "(˘o˘) z z Z"
 SPARKLES_KAOMOJI = "*,+.~"
 
 # fallback ASCII kaomoji if Unicode doesn't work
+# from emojicombos.com/kaomoji (and my own custom kaomoji that i made)
 HAPPY_KAOMOJI_SIMPLE = "(^_^)"
 SAD_KAOMOJI_SIMPLE = "(-_-)"
 NEUTRAL_KAOMOJI_SIMPLE = "(o_o)"
@@ -29,6 +31,28 @@ SPARKLES_KAOMOJI_SIMPLE = "(*)"
 # font options to try for better Unicode support
 UNICODE_FONTS = ['arial', 'helvetica', 'times', 'courier', 'verdana']
 DEFAULT_FONT = 'monospace'
+
+class FurniturePiece:
+    def __init__(self, name, x, y, width, height, variants):
+        self.name = name
+        self.x = x  # top-left corner
+        self.y = y  # top-left corner
+        self.width = width
+        self.height = height
+        self.variants = variants  # list of PNG filenames
+        self.currentVariant = 0  # index of current variant (0 = original/none)
+        
+    def isClicked(self, mouseX, mouseY):
+        return (self.x <= mouseX <= self.x + self.width and 
+                self.y <= mouseY <= self.y + self.height)
+    
+    def cycleVariant(self):
+        self.currentVariant = (self.currentVariant + 1) % len(self.variants)
+        
+    def getCurrentVariantPath(self):
+        if self.currentVariant == 0:
+            return None  # no overlay, use original background (pre-drawn furniture)
+        return f"images/furniture/{self.variants[self.currentVariant]}"
 
 class Cat:
     def __init__(self, name, x, y, personality=None):
@@ -87,7 +111,7 @@ class Cat:
 
         self.isSelected = False
         
-        # Running behavior
+        # running behavior
         self.isRunning = False
         self.runTimer = 0
         self.runDuration = 0
@@ -124,12 +148,12 @@ class Cat:
             self.y = mouseY - self.dragOffsetY
 
     def updateRunning(self):
-        """Handle random running behavior"""
+        # we need to handle "random" running
         if not self.isBeingDragged and not self.isSleeping and not self.isRunning:
             # only start running if cat is not sleeping and not already running
             # much lower chance 
-            chance = random.randint(1, 1000)  # Changed from 100 to 1000
-            threshold = 3 * self.personality['playfulness']  # Changed from 20 to 3
+            chance = random.randint(1, 1000) 
+            threshold = 3 * self.personality['playfulness']
             if chance < threshold:
                 self.startRunning()
         
@@ -142,11 +166,11 @@ class Cat:
             dy = self.runTargetY - self.y
             distance = (dx**2 + dy**2)**0.5
             
-            # always face right when running (remove direction tracking)
+            # always face right when running
             self.facingLeft = False
             
-            if distance > 2:  # even smaller threshold for ultra-smooth stopping
-                # very smooth movement towards target
+            if distance > 2: 
+                # an attempt tp make a smooth movement towards the target
                 moveX = (dx / distance) * self.runSpeed
                 moveY = (dy / distance) * self.runSpeed
                 
@@ -173,8 +197,8 @@ class Cat:
         # pick a random valid target position that's to the RIGHT of current position
         attempts = 0
         while attempts < 10:  # try to find valid position
-            minX = max(100, int(self.x + 50))
-            maxX = 1700
+            minX = max(80, int(self.x + 50))
+            maxX = 1200
             if minX < maxX:
                 targetX = random.randint(max(100, int(self.x + 50)), 1800)  # only targets to the right
                 targetY = random.randint(100, 900)
@@ -410,7 +434,7 @@ class Cat:
                 except:
                     pass
 
-        drawLabel(self.name, self.x, self.y + 60, size=14, bold=True, fill='black', font='monospace')
+        drawLabel(self.name, self.x, self.y + 60, size=14, bold=True, fill='cadetBlue', font='monospace')
 
 def drawUnicodeLabel(text, x, y, size=16, bold=False, fill='black', align='center'):
     # i try to draw text with Unicode support by testing different font but it'll fall back to simple ASCII if Unicode fails
@@ -464,13 +488,36 @@ def createCatPersonalities():
     }
     return personalities
 
+def createFurniturePieces():
+    # Define clickable furniture areas and their variants
+    # You'll need to adjust these coordinates based on your room layout
+    furniture = [
+        FurniturePiece(
+            name="bed",
+            x=633, y=481, width=259, height=168,
+            variants=["original", "bed_purple.png"]
+        ),
+        FurniturePiece(
+            name="post",
+            x=101,y=545, width=131,height=188,
+            variants=["original", "post_green.png", "post_red.png"]
+        ),
+        # i will add more furniture pieces later
+        # furniturePiece(
+        #     name="bookshelf",
+        #     x=100, y=200, width=60, height=150,
+        #     variants=["original", "bookshelf_oak.png", "bookshelf_cherry.png"]
+        # ),
+    ]
+    return furniture
+
 # define allowed placement area for isometric room floor
 def isValidPosition(x, y):
     # isometric room boundaries based on the floor area
-    centerX = 1000  
-    centerY = 650      
-    width = 2000    
-    height = 400      
+    centerX = 600  
+    centerY = 700      
+    width = 580   
+    height = 580      
     
     dx = x - centerX
     dy = y - centerY
@@ -478,9 +525,35 @@ def isValidPosition(x, y):
     # diamond shape condition for the floor area
     return abs(dx) / (width / 2) + abs(dy) / (height / 2) <= 1
 
+def drawFurnitureOverlays(app):
+    for furniture in app.furniture:
+        variantPath = furniture.getCurrentVariantPath()
+        if variantPath:  # only draw if not using original
+            try:
+                drawImage(variantPath, furniture.x, furniture.y, 
+                         width=furniture.width, height=furniture.height)
+            except:
+                # fallback if image doesn't exist
+                drawRect(furniture.x, furniture.y, furniture.width, furniture.height,
+                        fill='lightGray', border='red', borderWidth=2, opacity=50)
+                drawLabel(f"Missing:\n{variantPath}", 
+                         furniture.x + furniture.width//2, furniture.y + furniture.height//2,
+                         size=10, fill='red', font='monospace')
+
+# added this function to show clickable furniture areas (optional debug mode)
+def drawFurnitureClickAreas(app, showDebug=False):
+    if showDebug:
+        for furniture in app.furniture:
+            # draw clickable area outline
+            drawRect(furniture.x, furniture.y, furniture.width, furniture.height,
+                    fill=None, border='yellow', borderWidth=2, opacity=70)
+            drawLabel(f"{furniture.name}\n{furniture.currentVariant+1}/{len(furniture.variants)}", 
+                     furniture.x + furniture.width//2, furniture.y + furniture.height//2,
+                     size=12, fill='yellow', font='monospace', bold=True)
+
 def onAppStart(app):
-    app.width = 1920
-    app.height = 1080
+    app.width = 1200
+    app.height = 1400
     app.stepCounter = 0
     app.gameTime = 0
     app.selectedCat = None
@@ -499,11 +572,14 @@ def onAppStart(app):
 
     app.cats = [
         Cat("churrio", 600, 600, personalities['energetic']),
-        Cat("beepaw", 1365, 510, personalities['independent']),
+        Cat("beepaw", 400, 650, personalities['independent']),
         Cat("meeple", 800, 650, personalities['clean']),
         Cat("elwin", 1000, 700, personalities['social']),
     ]
     
+    # furniture inititalize 
+    app.furniture = createFurniturePieces()
+
     # popup menu settings
     app.popupWidth = 350
     app.popupHeight = 370
@@ -512,7 +588,7 @@ def onAppStart(app):
     
     # initialize actionButtons to avoid AttributeError
     app.actionButtons = {}
-
+            
 def drawStatBar(x, y, width, height, value, maxValue, color, label):
     # background bar
     drawRect(x, y, width, height, fill='lightGray', border='darkGray', borderWidth=1)
@@ -700,6 +776,13 @@ def onMousePress(app, mouseX, mouseY):
         if (popupX <= mouseX <= popupX + popupW and 
             popupY <= mouseY <= popupY + popupH):
             return  # Click was inside popup but not on a button, ignore it
+    
+    # Check furniture clicks BEFORE cat clicks
+    for furniture in app.furniture:
+        if furniture.isClicked(mouseX, mouseY):
+            furniture.cycleVariant()
+            print(f"Clicked {furniture.name}, now showing variant {furniture.currentVariant}")
+            return  # don't process cat clicks if furniture was clicked
 
     # check if user clicked on a cat (works even if popup is open)
     for cat in app.cats:
@@ -765,20 +848,22 @@ def onKeyPress(app, key):
                 print("Elwin is already running!")
         else:
             print("Could not find Elwin!")
-    # elif key == 's':  '''Press 'S' to see all cat states'''
-    #     print("=== CAT STATUS ===")
-    #     for cat in app.cats:
-    #         print(f"{cat.name}: running={cat.isRunning}, activity={cat.activity}, playfulness={cat.personality['playfulness']}")
-    #         print(f"  Position: ({cat.x}, {cat.y}), dragged={cat.isBeingDragged}, sleeping={cat.isSleeping}")
+    elif key == 'f':  # press 'F' to show furniture info
+        print("=== FURNITURE STATUS ===")
+        for furniture in app.furniture:
+            print(f"{furniture.name}: variant {furniture.currentVariant}/{len(furniture.variants)-1} - {furniture.variants[furniture.currentVariant] if furniture.currentVariant > 0 else 'original'}")
 
 def redrawAll(app):
     drawRect(0, 0, app.width, app.height, fill=rgb(245, 245, 220))
     
     try:
-        drawImage("images/basic_room.png", 0, 0, width=app.width, height=app.height)
+        drawImage("images/basic_room2.png", 0, 0, width=app.width, height=app.height)
     except:
-        drawLabel("Background image missing: images/basic_room.png", app.width//2, 50, size=16, fill='red', font='monospace')
-    
+        drawLabel("Background image missing: images/basic_room2.png", app.width//2, 50, size=16, fill='red', font='monospace')
+
+    # Draw furniture overlays after background but before cats
+    drawFurnitureOverlays(app)
+
     # draw cats that aren't being dragged first
     catsToDraw = [cat for cat in app.cats if not cat.isBeingDragged]
     for cat in catsToDraw:
@@ -798,12 +883,12 @@ def redrawAll(app):
     else:
         # instruction text with nice styling - using kaomoji
         instructionY = 100
-        boxWidth = 600 
+        boxWidth = 680 
         drawRect(app.width//2 - boxWidth//2, instructionY - 50, boxWidth, 60, 
                 fill='aliceBlue', border='cadetBlue', borderWidth=2, opacity=90)
         drawLabel(f"{HAPPY_KAOMOJI} Click on a cat to interact! {HAPPY_KAOMOJI}", app.width//2, instructionY-30, 
                  size=20, bold=True, fill='cadetBlue', font='monospace')
-        drawLabel("Drag them around the room", app.width//2, instructionY -5, 
+        drawLabel("Drag the cats around the room • Click the bed and cat post to recolor!", app.width//2, instructionY -5, 
                  size=16, fill='gray', font='monospace', bold=True)
     
     if app.draggingCat:
@@ -816,6 +901,9 @@ def redrawAll(app):
         drawLabel("Place them on the floor area", app.width//2, dragY + 25, 
                  size=16, fill='gray', font='monospace')
     
+    # optional debug mode to show furniture click areas
+    # drawFurnitureClickAreas(app, showDebug=True)  # Set to True to see clickable areas
+    
     # show pause indicator
     if app.paused:
         drawRect(app.width//2 - 100, 50, 200, 40, fill='black', opacity=70)
@@ -823,10 +911,11 @@ def redrawAll(app):
     
     controlsX = app.width - 20
     controlsY = app.height - 30
-    drawRect(controlsX - 180, controlsY - 40, 200, 70, fill='steelBlue', opacity=60)
-    drawLabel("Extra Controls", controlsX - 80, controlsY - 30, size=18, bold=True, fill='white', font='monospace', align='center')
-    drawLabel("P = Pause/Resume", controlsX - 80, controlsY - 5, size=14, fill='black', font='monospace', align='center')
-    drawLabel("R = Make Elwin Run", controlsX - 80, controlsY + 10, size=14, fill='black', font='monospace', align='center')
+    drawRect(controlsX - 200, controlsY - 55, 220, 85, fill='steelBlue', opacity=60)
+    drawLabel("Extra Controls", controlsX - 90, controlsY - 40, size=18, bold=True, fill='white', font='monospace', align='center')
+    drawLabel("P = Pause/Resume", controlsX - 90, controlsY - 15, size=14, fill='black', font='monospace', align='center')
+    drawLabel("R = Make Elwin Run", controlsX - 90, controlsY + 5, size=14, fill='black', font='monospace', align='center')
+    drawLabel("F = Furniture Info", controlsX - 90, controlsY + 25, size=14, fill='black', font='monospace', align='center')
 
 
 def main():
