@@ -330,7 +330,7 @@ class Cat:
     def draw(self, app):
         self.animationFrame += 1
         self.updateAnimation()
-        self.updateRunning()  # Add running behavior
+        self.updateRunning()  # add running behavior
 
         spriteLoaded = False
 
@@ -564,9 +564,17 @@ def onAppStart(app):
     app.mouseX = 0
     app.mouseY = 0
     
-    # initialize paused state and sound (commented out rn)
+    # initialize paused state 
     app.paused = False
-    # app.sound = Sound(url) 
+    # load background music ("cats in the cold - mage tears")
+    app.backgroundMusic = Sound("sounds/background_music.mp3")
+    app.musicEnabled = True
+    app.musicPlaying = False
+
+    # auto-start background music
+    if app.musicEnabled:
+        app.backgroundMusic.play(loop=True)
+        app.musicPlaying = True
 
     personalities = createCatPersonalities()
 
@@ -777,7 +785,7 @@ def onMousePress(app, mouseX, mouseY):
             popupY <= mouseY <= popupY + popupH):
             return  # Click was inside popup but not on a button, ignore it
     
-    # Check furniture clicks BEFORE cat clicks
+    # check furniture clicks BEFORE cat clicks
     for furniture in app.furniture:
         if furniture.isClicked(mouseX, mouseY):
             furniture.cycleVariant()
@@ -830,10 +838,26 @@ def onStep(app):
 def onKeyPress(app, key):
     if key == 'p':
         app.paused = not app.paused
-        # if app.paused:
-        #     app.sound.pause()
-        # else:
-        #     app.sound.play(loop=True)
+    # pause/resume music with game
+        if app.musicEnabled:
+            if app.paused:
+                app.backgroundMusic.pause()
+                app.musicPlaying = False
+            else:
+                app.backgroundMusic.play(loop=True)
+                app.musicPlaying = True
+    elif key == 'm':  # press 'M' to toggle music on/off
+        if app.musicEnabled:
+            if app.musicPlaying:
+                app.backgroundMusic.pause()
+                app.musicPlaying = False
+                print("Music paused")
+            else:
+                app.backgroundMusic.play(loop=True)
+                app.musicPlaying = True
+                print("Music playing")
+        else:
+            print("Music not available")
     elif key == 'r':  # press 'R' to make Elwin run
         elwin = None
         for cat in app.cats:
@@ -916,6 +940,12 @@ def redrawAll(app):
     drawLabel("P = Pause/Resume", controlsX - 90, controlsY - 15, size=14, fill='black', font='monospace', align='center')
     drawLabel("R = Make Elwin Run", controlsX - 90, controlsY + 5, size=14, fill='black', font='monospace', align='center')
     drawLabel("F = Furniture Info", controlsX - 90, controlsY + 25, size=14, fill='black', font='monospace', align='center')
+    # music status indicator
+    if app.musicEnabled:
+        musicStatus = "♪♫ ON" if app.musicPlaying else "♪♫ OFF"
+        musicColor = 'lightGreen' if app.musicPlaying else 'lightCoral'
+        drawRect(app.width - 80, 20, 60, 25, fill=musicColor, border='black', borderWidth=2, opacity=30)
+        drawLabel(musicStatus, app.width - 50, 32, size=12, bold=True, fill='black', font='monospace')
 
 
 def main():
