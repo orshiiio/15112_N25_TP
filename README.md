@@ -1,4 +1,4 @@
-# 🐈 15112_N25_TP: Virtual Cat Cafe  
+# 🐈 15112_N25_TP: Fundamentals or Purr-ogramming Cafe  
 A cozy and interactive Python-based simulation where you can care for cats with unique personalities in a customizable room environment.
 ---
 ## ✨ Features  
@@ -30,16 +30,17 @@ A cozy and interactive Python-based simulation where you can care for cats with 
 ## 🛠️ Technical Details  
 
 ### 🔧 Built With  
-- **Python** Core logic and rendering  
+- **Python/CMU Graphics** Core logic and rendering  
 - **OOP Design**: Modular, class-based architecture  
 - **State Management**: Complex animation states, mood tracking, and behavioral systems
-- **Event-Driven Architecture**: Mouse clicks, drag operations, and keyboard shortcuts
+- **Event-Driven Architecture**: Mouse clicks, drag operations, and keyboard shortcuts (with collision/valid area checks)
 
 ### 🏗️ Architecture
 - **Cat Class**: Manages individual cat stats, animations, personalities, and behaviors
 - **FurniturePiece Class**: Handles clickable furniture areas and variant cycling
 - **Personality System**: Configurable trait multipliers affecting cat behavior rates
 - **Animation Engine**: Frame-based sprite animation with state-dependent timing
+- **Absence System**: Monitors time away and applies realistic consequences to cat care
 
 ---
 
@@ -57,9 +58,13 @@ A cozy and interactive Python-based simulation where you can care for cats with 
 - **Valid placement**: Cats can only be placed in the diamond-shaped floor area
 
 ### ⌨️ Controls
-- **P**: Pause/Resume the simulation
-- **R**: Force Elwin to run around (with an included debug feature)
-- **F**: Print furniture status to console
+- **m**: Pause/Resume the music
+- **r**: Force Elwin to run around 
+- **f**: Print furniture status to console
+- **t**: Test 1 hour of user absence
+- **z**: Debug mode with user interaction timestamps
+- **y**: Test the absence pop-up
+- **p**: Force the absence pop-up to appear
 - **Mouse**: Click cats to interact, drag to move, click furniture to recolor
 
 ------
@@ -75,7 +80,13 @@ A cozy and interactive Python-based simulation where you can care for cats with 
 2. Ensure you have the required folder structure:
    ```
    project/
-   ├── main.py
+   ├── main_game.py
+   ├── utils.py
+   ├── constants.py
+   ├── cat.py
+   ├── absence_tracker.py
+   ├── furniture.py
+   ├── last_active.txt [this will be created upon running the game for the first time]
    ├── images/
    │   ├── basic_room2.png
    │   ├── cats/
@@ -106,11 +117,23 @@ A cozy and interactive Python-based simulation where you can care for cats with 
 ### 🎨 Room Customization
 - **Experiment with colors**: Click furniture multiple times to see all variants
 - **Placement strategy**: Position cats where you can easily click them
-- **Use debug mode**: Enable yellow outlines to see exact clickable areas
+- **Use debug mode**: Print information about the furniture and user activity within the console
 
 ---
 
 ## 📝 Update Log
+
+### 🗓️ July 31, 2025
+- Implemeted a collision check for cats to prevent position overlap
+- Modified "Extra Controls" with all new features 
+- Checked all game features/funtionalities 
+- [PROJECT SUBMITTED FOR GRADING]
+
+### 🗓️ July 30, 2025
+- Added time tracking module
+- Added pop-up for user "time-away" indication
+- Added additional debugging keys
+- Fixed issue with sprite/mood switching
 
 ### 🗓️ July 29, 2025
 - Implemented furniture recoloring system with bed and cat post variants
@@ -136,12 +159,9 @@ A cozy and interactive Python-based simulation where you can care for cats with 
 
 ---
 
-## 🏆 Features in Development [as of 07/29/25]
+## 🏆 Features in Development [in the Future]
 - More furniture pieces and color variants
 - Additional cat breeds and personalities
-- Sound effects and background music
-- Save/load game states
-- Customer interaction system
 - Cafe rating and progression mechanics
 
 ---
