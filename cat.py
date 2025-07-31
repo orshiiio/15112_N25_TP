@@ -1,17 +1,21 @@
+#############################################
+##           arshia dabas 2025             ##
+##   fundamentals of purr-ogramming cafe   ##
+#############################################
+
 from cmu_graphics import *
 import random
 
 # define allowed placement area for isometric room floor
+# again this took a lot of trial and error to create 
 def isValidPosition(x, y):
     # isometric room boundaries based on the floor area
     centerX = 600  
     centerY = 700      
     width = 580   
     height = 580      
-    
     dx = x - centerX
     dy = y - centerY
-    
     # diamond shape condition for the floor area
     return abs(dx) / (width / 2) + abs(dy) / (height / 2) <= 1
 
@@ -113,7 +117,7 @@ class Cat:
             self.y = mouseY - self.dragOffsetY
 
     def updateRunning(self):
-        # we need to handle "random" running
+        # need to handle "random" running
         if not self.isBeingDragged and not self.isSleeping and not self.isRunning:
             # only start running if cat is not sleeping and not already running
             # much lower chance 
@@ -158,7 +162,6 @@ class Cat:
         self.isRunning = True
         self.runTimer = 0
         self.runDuration = random.randint(90, 150)  # run for 3-5 seconds (30 fps = 90-150 frames)
-        
         # pick a random valid target position that's to the RIGHT of current position
         attempts = 0
         while attempts < 10:  # try to find valid position
@@ -206,7 +209,6 @@ class Cat:
             # revert to last valid position
             self.x = self.lastValidX
             self.y = self.lastValidY
-        
         self.isBeingDragged = False
         self.happiness = min(100, self.happiness + 2)
 
@@ -278,8 +280,7 @@ class Cat:
             spriteFilename = f"{self.name}_{currentState}_{frameNum}.png"
         else:
             # single frame animations
-            spriteFilename = f"{self.name}_{currentState}.png"
-            
+            spriteFilename = f"{self.name}_{currentState}.png"  
         return f"images/cats/{spriteFilename}"
 
     def updateStats(self, timeMultiplier=1):
@@ -319,7 +320,6 @@ class Cat:
     def startAutonomousActivity(self, activity):
         self.activity = activity
         self.autonomousTimer = random.randint(60, 180)  # 2-6 seconds at 30fps
-        
         if activity == "wandering":
             # move to a random valid location
             attempts = 0
@@ -330,16 +330,13 @@ class Cat:
                     self.x = targetX
                     self.y = targetY
                     break
-                attempts += 1
-                
+                attempts += 1   
         elif activity == "foraging":
             # slowly recover hunger
             self.hunger = min(100, self.hunger + 10)
-            
         elif activity == "self-grooming":
             # Iiprove cleanliness
             self.cleanliness = min(100, self.cleanliness + 15)
-            
         elif activity == "playing":
             # boost happiness but use energy
             self.happiness = min(100, self.happiness + 8)
@@ -359,7 +356,6 @@ class Cat:
         self.updateAutonomousBehavior()  # update autonomous behaviors
         spriteLoaded = False
         # first we try the primary sprite system
-        # 
         if not spriteLoaded:
             try:
                 spritePath = self.getSpritePath()
@@ -417,13 +413,11 @@ class Cat:
                 frameInfo = f"{currentState}"
             drawLabel(frameInfo, self.x, self.y + 25, 
                      size=9, font='monospace')
-
         if self.isBeingDragged:
             drawCircle(self.x, self.y + 5, 45, fill='black', opacity=20)
 
         # emotion bubble logic
         emotionPath = None
-
         if self.isBeingDragged:
             emotionPath = "images/emotions/surprised.png"
         elif self.hunger < 25:

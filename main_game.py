@@ -1,3 +1,8 @@
+#############################################
+##           arshia dabas 2025             ##
+##   fundamentals of purr-ogramming cafe   ##
+#############################################
+
 from cmu_graphics import *
 from cat import Cat
 from furniture import *

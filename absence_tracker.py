@@ -1,9 +1,14 @@
+#############################################
+##           arshia dabas 2025             ##
+##   fundamentals of purr-ogramming cafe   ##
+#############################################
+
 import time
 import os
 import random
 
-# information from: https://docs.python.org/3/library/time.html
-# idea for using a text file and rewriting over it by Elwin Li (incoming F25 TA)
+# "time" information from: https://docs.python.org/3/library/time.html
+# idea for using a text file and rewriting over it was suggested by Elwin Li (incoming F25 TA) [all further implementation was my own]
 # documentation for try/except from: https://www.w3schools.com/python/python_try_except.asp)
 # please note that all the "random" print statements are actually largely for user-debugging and peace of mind (useful just to check)
 # they serve no real in-game purpose and are not displayed other than in the console 
@@ -79,7 +84,6 @@ class AbsenceTracker:
     def getAbsenceLevel(self):
         # categorized absence level
         absenceTime = self.getAbsenceTime()
-        
         if absenceTime < self.absenceThresholds['short']:
             return 'active'
         elif absenceTime < self.absenceThresholds['medium']:
@@ -96,7 +100,6 @@ class AbsenceTracker:
     def checkForAbsence(self):
         # check if user has been absent and trigger effects
         absenceTime = self.getAbsenceTime()
-        
         # only trigger absence effects if we haven't already
         if self.isActive and absenceTime > self.absenceThresholds['short']:
             self.isActive = False
@@ -105,9 +108,7 @@ class AbsenceTracker:
     def onUserAbsence(self, absenceTime):
         # handle what happens when user goes absent
         level = self.getAbsenceLevel()
-        
         print(f"User absent for {absenceTime:.0f} seconds (level: {level})")
-        
         # apply effects based on absence level
         if level == 'short':
             self.applyShortAbsenceEffects()
@@ -140,8 +141,7 @@ class AbsenceTracker:
             cat.hunger = max(0, cat.hunger - 15)
             cat.energy = max(0, cat.energy - 8)
             cat.cleanliness = max(0, cat.cleanliness - 5)
-            
-            # Cats start autonomous behaviors
+            # cats start autonomous behaviors
             if cat.activity == "idle" and not cat.isRunning:
                 if random.random() < 0.3:  # 30% chance
                     cat.startAutonomousActivity("wandering")
@@ -154,7 +154,6 @@ class AbsenceTracker:
             cat.hunger = max(0, cat.hunger - 30)
             cat.energy = max(0, cat.energy - 15)
             cat.cleanliness = max(0, cat.cleanliness - 15)
-            
             # more autonomous behaviors
             if cat.activity == "idle" and not cat.isRunning:
                 activities = ["wandering", "playing", "self-grooming"]
@@ -168,7 +167,6 @@ class AbsenceTracker:
             cat.hunger = max(0, cat.hunger - 50)
             cat.energy = max(0, cat.energy - 25)
             cat.cleanliness = max(0, cat.cleanliness - 30)
-            
             # survival behaviors based on needs
             if cat.hunger < 30:
                 cat.startAutonomousActivity("foraging")

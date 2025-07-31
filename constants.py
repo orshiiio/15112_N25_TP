@@ -1,3 +1,8 @@
+#############################################
+##           arshia dabas 2025             ##
+##   fundamentals of purr-ogramming cafe   ##
+#############################################
+
 # i originally did a pip-install with this: https://pypi.org/project/py-kaomoji/
 # the try/except format is from a previous Claude prompt (but i later learnt more about it from: https://www.w3schools.com/python/python_try_except.asp)
 try:
