@@ -1,7 +1,12 @@
 import time
-import json
 import os
 import random
+
+# information from: https://docs.python.org/3/library/time.html
+# idea for using a text file and rewriting over it by Elwin Li (incoming F25 TA)
+# documentation for try/except from: https://www.w3schools.com/python/python_try_except.asp)
+# please note that all the "random" print statements are actually largely for user-debugging and peace of mind (useful just to check)
+# they serve no real in-game purpose and are not displayed other than in the console 
 
 class AbsenceTracker:
     def __init__(self, app):
@@ -9,60 +14,70 @@ class AbsenceTracker:
         self.lastActiveTime = time.time()
         self.isActive = True
         self.absenceThresholds = {
-            'short': 300,    # 5 minutes
-            'medium': 1800,  # 30 minutes  
-            'long': 3600,    # 1 hour
+            'short': 300,      # 5 minutes
+            'medium': 1800,    # 30 minutes  
+            'long': 3600,      # 1 hour
             'extended': 14400, # 4 hours
             'overnight': 28800 # 8 hours
         }
-        self.saveFile = "user_activity.json"
+        self.saveFile = "last_active.txt"  # simple text file
         self.loadActivityData()
         
     def loadActivityData(self):
+        # load last active time from text file
         try:
             if os.path.exists(self.saveFile):
                 with open(self.saveFile, 'r') as f:
-                    data = json.load(f)
-                    self.lastActiveTime = data.get('lastActiveTime', time.time())
-        except:
+                    timeStr = f.read().strip()
+                    if timeStr:  # Make sure file isn't empty
+                        self.lastActiveTime = float(timeStr)
+                        print(f"Loaded last active time: {self.lastActiveTime}")
+                        print(f"That was {time.time() - self.lastActiveTime:.1f} seconds ago")
+                    else:
+                        print("File was empty, using current time")
+                        self.lastActiveTime = time.time()
+                        self.saveActivityData()
+            else:
+                print("No save file found, creating new one")
+                self.lastActiveTime = time.time()
+                self.saveActivityData()
+        except Exception as e:
+            print(f"Error loading activity data: {e}")
             self.lastActiveTime = time.time()
+            self.saveActivityData()
     
     def saveActivityData(self):
-        # save activity
+        # save current activity time to text file
         try:
-            data = {
-                'lastActiveTime': self.lastActiveTime,
-                'timestamp': time.time()
-            }
             with open(self.saveFile, 'w') as f:
-                json.dump(data, f)
-        except:
-            pass
+                f.write(str(self.lastActiveTime))
+            print(f"Saved activity time: {self.lastActiveTime}")
+            return True
+        except Exception as e:
+            print(f"Error saving activity data: {e}")
+            return False
     
     def updateActivity(self):
-        # call with user movement
+        # need to call this when there's actual user activity
         was_absent = not self.isActive
+        old_time = self.lastActiveTime
         
         self.lastActiveTime = time.time()
         self.isActive = True
-        self.saveActivityData()  # save the activity data to file
+        
+        # save immediately
+        success = self.saveActivityData()
+        print(f"Activity updated: {old_time:.1f} -> {self.lastActiveTime:.1f} (saved: {success})")
         
         if was_absent:
             self.onUserReturn()
-
-    def checkForAbsence(self):
-        # check if user has been absent - call this periodically
-        absenceTime = self.getAbsenceTime()
-        if self.isActive and absenceTime > self.absenceThresholds['short']:
-            self.isActive = False
-            self.onUserAbsence(absenceTime)
     
     def getAbsenceTime(self):
         # get how long user has been inactive in seconds
         return time.time() - self.lastActiveTime
     
     def getAbsenceLevel(self):
-        # get categorized absence level
+        # categorized absence level
         absenceTime = self.getAbsenceTime()
         
         if absenceTime < self.absenceThresholds['short']:
@@ -78,8 +93,17 @@ class AbsenceTracker:
         else:
             return 'overnight'
     
+    def checkForAbsence(self):
+        # check if user has been absent and trigger effects
+        absenceTime = self.getAbsenceTime()
+        
+        # only trigger absence effects if we haven't already
+        if self.isActive and absenceTime > self.absenceThresholds['short']:
+            self.isActive = False
+            self.onUserAbsence(absenceTime)
+    
     def onUserAbsence(self, absenceTime):
-        # what happens when user goes absent
+        # handle what happens when user goes absent
         level = self.getAbsenceLevel()
         
         print(f"User absent for {absenceTime:.0f} seconds (level: {level})")
@@ -102,11 +126,15 @@ class AbsenceTracker:
         print(f"Welcome back! You were away for {self.formatTime(absenceTime)}")
     
     def applyShortAbsenceEffects(self):
+        # effects for 5-30 minute absence
+        print("Applying short absence effects...")
         for cat in self.app.cats:
             cat.happiness = max(0, cat.happiness - 5)
             cat.energy = max(0, cat.energy - 3)
     
     def applyMediumAbsenceEffects(self):
+        # effects for 30 minute - 1 hour absence
+        print("Applying medium absence effects...")
         for cat in self.app.cats:
             cat.happiness = max(0, cat.happiness - 10)
             cat.hunger = max(0, cat.hunger - 15)
@@ -119,6 +147,8 @@ class AbsenceTracker:
                     cat.startAutonomousActivity("wandering")
     
     def applyLongAbsenceEffects(self):
+        # effects for 1-4 hour absence
+        print("Applying long absence effects...")
         for cat in self.app.cats:
             cat.happiness = max(0, cat.happiness - 20)
             cat.hunger = max(0, cat.hunger - 30)
@@ -131,6 +161,8 @@ class AbsenceTracker:
                 cat.startAutonomousActivity(random.choice(activities))
     
     def applyExtendedAbsenceEffects(self):
+        # effects for 4-8 hour absence
+        print("Applying extended absence effects...")
         for cat in self.app.cats:
             cat.happiness = max(0, cat.happiness - 35)
             cat.hunger = max(0, cat.hunger - 50)
@@ -146,12 +178,14 @@ class AbsenceTracker:
                 cat.startAutonomousActivity("self-grooming")
     
     def applyOvernightAbsenceEffects(self):
+        # effects for 8+ hour absence (overnight)
+        print("Applying overnight absence effects...")
         for cat in self.app.cats:
             # simulate full day/night cycle
             cat.energy = min(100, cat.energy + 30)  # rested from sleeping
             cat.hunger = max(0, cat.hunger - 60)  # got hungry overnight
             cat.cleanliness = max(0, cat.cleanliness - 40)  # got messy
-            cat.happiness = max(0, cat.happiness - 25)  # missed you but adapted
+            cat.happiness = max(0, cat.happiness - 25)  #missed user but adapted
             
             # set appropriate activity for their current state
             if cat.hunger < 20:

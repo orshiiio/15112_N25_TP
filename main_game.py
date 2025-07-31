@@ -5,6 +5,7 @@ from absence_tracker import *
 from utils import *
 from constants import *
 
+import os
 import random
 import math
 import time
@@ -39,9 +40,9 @@ def onAppStart(app):
         app.awayTimeText = app.absenceTracker.formatTime(absenceTime)
         app.absenceLevelText = app.absenceTracker.getAbsenceLevel()
         app.showAwayTime = True
-        app.awayTimeTimer = 240  # Show for 8 seconds at 30fps
+        app.awayTimeTimer = 600 
     
-    # load background music ("cats in the cold - mage tears")
+    # load background music ("cats in the cold - mage tears" from https://www.youtube.com/watch?v=7Tzq6isGOjg)
     # asked Joshua Wang how to do this (and looked at CMU graphics)
     app.backgroundMusic = Sound("sounds/background_music.mp3")
     app.musicEnabled = True
@@ -72,7 +73,7 @@ def onAppStart(app):
     app.actionButtons = {}
 
 def updateActionButtons(app):
-    # logic is based on what Mike Taylor discussed in lecture [07/29]
+    # all button logic is based on what Professor Mike Taylor discussed in lecture [07/29]
     if app.selectedCat:
         popupX, popupY = app.popupX, app.popupY
         popupW, popupH = app.popupWidth, app.popupHeight
@@ -107,21 +108,16 @@ def drawCatPopup(app, cat):
     # popup background with rounded corners effect
     popupX, popupY = app.popupX, app.popupY
     popupW, popupH = app.popupWidth, app.popupHeight
-    
-    # shadow effect
+    # shadow effect (this is something i used often whilst designing in HTML)
     drawRect(popupX + 3, popupY + 3, popupW, popupH, fill='black', opacity=30)
-    
     # main popup background
     drawRect(popupX, popupY, popupW, popupH, fill='aliceBlue', border='cadetBlue', borderWidth=3)
-    
     # header section
     headerHeight = 60
     drawRect(popupX, popupY, popupW, headerHeight, fill='aliceBlue', border='cadetBlue', borderWidth=2)
-    
     # cat name
     drawUnicodeLabel(f"{HAPPY_KAOMOJI} {cat.name.title()}", popupX + popupW//2, popupY + 20, 
                     size=24, bold=True, fill='cadetBlue', align='center')
-
     # close button (X)
     closeX = popupX + popupW - 30
     closeY = popupY + 30
@@ -138,12 +134,10 @@ def drawCatPopup(app, cat):
 
     drawUnicodeLabel(f"Mood: {moodKaomoji} {cat.mood.title()}", popupX + popupW//2, popupY + 45, 
                     size=14, bold=True, fill='cadetBlue', align='center')
-        
     # stats section
     statsY = popupY + headerHeight + 20
     statHeight = 25
     statSpacing = 35
-    
     # stat bars with colors
     statColors = {
         'hunger': 'lightSalmon',
@@ -168,7 +162,6 @@ def drawCatPopup(app, cat):
     activityY = statsY + statSpacing * 4 + 20
     drawRect(popupX + 10, activityY - 10, popupW - 20, 40, fill='lightYellow', 
              border='orange', borderWidth=2)
-    
     if cat.isSleeping:
         activityText = f"Current Activity: Sleeping {SLEEPING_KAOMOJI}"
     elif cat.activity == "eating":
@@ -190,7 +183,6 @@ def drawCatPopup(app, cat):
     buttonWidth = 80
     buttonHeight = 40
     buttonSpacing = 20
-    
     # calculate button positions to center them
     totalButtonWidth = buttonWidth * 3 + buttonSpacing * 2
     startX = popupX + (popupW - totalButtonWidth) // 2
@@ -204,24 +196,21 @@ def drawCatPopup(app, cat):
     for button in buttons:
         # button shadow
         drawRect(button['x'] + 2, buttonY + 2, buttonWidth, buttonHeight, fill='gray', opacity=50)
-        
         # main button
         buttonColor = 'lightGray' if app.draggingCat else button['color']
         drawRect(button['x'], buttonY, buttonWidth, buttonHeight, 
                 fill=buttonColor, border='black', borderWidth=2)
-        
         # button text
         drawLabel(button['text'], button['x'] + buttonWidth//2, buttonY + buttonHeight//2, 
                  size=10, bold=True, font='monospace')
 
 def onMousePress(app, mouseX, mouseY):
-    app.absenceTracker.updateActivity()
+    if time.time() - app.absenceTracker.lastActiveTime > 10:
+        app.absenceTracker.updateActivity()
     app.mouseX = mouseX
     app.mouseY = mouseY
-
     # update button positions before checking clicks
     updateActionButtons(app)
-
     # check popup button clicks FIRST if popup is open
     if app.selectedCat and hasattr(app, 'actionButtons'):
         for name, b in app.actionButtons.items():
@@ -241,21 +230,18 @@ def onMousePress(app, mouseX, mouseY):
                     app.draggingCat = None
                     updateActionButtons(app)  # clear buttons when closing popup
                     return  # don't process other clicks
-        
         # if popup is open and click is inside popup area, don't select other cats
         popupX, popupY = app.popupX, app.popupY
         popupW, popupH = app.popupWidth, app.popupHeight
         if (popupX <= mouseX <= popupX + popupW and 
             popupY <= mouseY <= popupY + popupH):
             return  # click was inside popup but not on a button, ignore it
-    
     # check furniture clicks BEFORE cat clicks
     for furniture in app.furniture:
         if furniture.isClicked(mouseX, mouseY):
             furniture.cycleVariant()
             print(f"Clicked {furniture.name}, now showing variant {furniture.currentVariant}")
             return  # don't process cat clicks if furniture was clicked
-
     # check if user clicked on a cat (works even if popup is open)
     for cat in app.cats:
         dist = ((mouseX - cat.x) ** 2 + (mouseY - cat.y) ** 2) ** 0.5
@@ -268,43 +254,37 @@ def onMousePress(app, mouseX, mouseY):
             return
 
 def onMouseDrag(app, mouseX, mouseY):
-    app.absenceTracker.updateActivity()
     app.mouseX = mouseX
     app.mouseY = mouseY
     if app.draggingCat:
         app.draggingCat.updateDragPosition(mouseX, mouseY)
 
 def onMouseRelease(app, mouseX, mouseY):
+    app.absenceTracker.updateActivity()
     app.mouseX = mouseX
     app.mouseY = mouseY
-    
     if app.draggingCat:
         dragDuration = app.stepCounter - app.dragStartTime
-        
         if dragDuration >= 10:
             app.draggingCat.x = max(100, min(app.width - 100, app.draggingCat.x))
             app.draggingCat.y = max(100, min(app.height - 150, app.draggingCat.y))
-        
         app.draggingCat.stopDrag()
         app.draggingCat = None
 
 def onStep(app):
     app.stepCounter += 1
     app.gameTime += 1
-    
     # handle away time popup timer
     if app.showAwayTime and app.awayTimeTimer > 0:
         app.awayTimeTimer -= 1
         if app.awayTimeTimer <= 0:
             app.showAwayTime = False
-    
     # regular game updates
     if app.stepCounter % 30 == 0:
         for cat in app.cats:
             cat.updateStats()
             if app.stepCounter % 120 == 0:
                 cat.activity = "idle"
-    
     # check for absence periodically (but don't update activity)
     if app.stepCounter % 90 == 0:  # every 3 seconds
         app.absenceTracker.checkForAbsence()
@@ -338,11 +318,16 @@ def onKeyPress(app, key):
                 print("Elwin is already running!")
         else:
             print("Could not find Elwin!")
+
     elif key == 'f':  # press 'F' to show furniture info in console
+        # print-statement format inspired by the 112 gradebook
         print("=== FURNITURE STATUS ===")
         for furniture in app.furniture:
+            # had to check CMU documentations for f-strings again for this 
             print(f"{furniture.name}: variant {furniture.currentVariant}/{len(furniture.variants)-1} - {furniture.variants[furniture.currentVariant] if furniture.currentVariant > 0 else 'original'}")
+            
     elif key == 't':  # test absence system
+        # print-statement format inspired by the 112 gradebook
         print("=== TESTING ABSENCE SYSTEM ===")
         print(f"Current absence time: {app.absenceTracker.formatTime(app.absenceTracker.getAbsenceTime())}")
         print(f"Absence level: {app.absenceTracker.getAbsenceLevel()}")
@@ -352,6 +337,82 @@ def onKeyPress(app, key):
         app.absenceTracker.isActive = True  # reset active state
         app.absenceTracker.checkForAbsence()
         print("Simulated 1 hour absence!")
+    elif key == 'z':  # press 'Z' to debug timestamps
+        # print-statement format inspired by the 112 gradebook
+        print("=== TIMESTAMP DEBUG ===")
+        
+        current_time = time.time()
+        print(f"Current time.time(): {current_time}")
+        print(f"Current readable: {time.ctime(current_time)}")
+        
+        saved_time = app.absenceTracker.lastActiveTime
+        print(f"Saved time: {saved_time}")
+        print(f"Saved readable: {time.ctime(saved_time)}")
+        
+        difference = current_time - saved_time
+        print(f"Difference: {difference:.1f} seconds")
+        
+        # check file contents
+        # i got this from: https://stackoverflow.com/questions/28737292/how-to-check-text-file-exists-and-is-not-empty-in-python
+        if os.path.exists("last_active.txt"):
+            with open("last_active.txt", 'r') as f:
+                content = f.read().strip()
+            print(f"File contains: '{content}'")
+            if content:
+                file_time = float(content)
+                print(f"File time readable: {time.ctime(file_time)}")
+        
+        # force reset timestamp
+        # recommended for debugging by Claude (AI)
+        # prompt: what format can i use to create a forced reset on my time text file in python
+        print("Resetting timestamp to current time...")
+        app.absenceTracker.lastActiveTime = current_time
+        app.absenceTracker.saveActivityData()
+        print("Timestamp reset!")
+
+    elif key == 'y':  # press 'Y' to manually test absence popup
+        print("=== MANUAL ABSENCE TEST ===")
+        
+        # set timestamp to 2 minutes ago
+        fake_time = time.time() - 120  # 2 minutes ago
+        
+        # write directly to file
+        # asked Claude how to write directly into a file because i was unsure
+        # prompt: "what are ways to directly replace something in a python text file"
+        with open("last_active.txt", 'w') as f:
+            f.write(str(fake_time))
+        # reload the absence tracker
+        app.absenceTracker.loadActivityData()
+        # check absence time
+        absenceTime = app.absenceTracker.getAbsenceTime()
+        print(f"Simulated absence time: {absenceTime:.1f} seconds")
+        # force show popup
+        if absenceTime > 30:
+            app.awayTimeText = app.absenceTracker.formatTime(absenceTime)
+            app.absenceLevelText = app.absenceTracker.getAbsenceLevel()
+            app.showAwayTime = True
+            app.awayTimeTimer = 900  # show for 30 seconds
+            print("Popup should now be visible!")
+            print(f"Timer set to: {app.awayTimeTimer}")
+        else:
+            print("Absence time too short for popup")
+
+    # force popup test key:
+    elif key == 'p':  # press 'P' to force show popup
+        print("=== FORCE POPUP TEST ===")
+        
+        # force set all popup variables
+        app.awayTimeText = "2 minutes"
+        app.absenceLevelText = "short"
+        app.showAwayTime = True
+        app.awayTimeTimer = 900  # show for 30 seconds
+        
+        print(f"Set popup variables:")
+        print(f"  awayTimeText: '{app.awayTimeText}'")
+        print(f"  absenceLevelText: '{app.absenceLevelText}'")
+        print(f"  showAwayTime: {app.showAwayTime}")
+        print(f"  awayTimeTimer: {app.awayTimeTimer}")
+        print("Popup should be visible now!")
 
 def redrawAll(app):
     drawRect(0, 0, app.width, app.height, fill=rgb(245, 245, 220))
@@ -362,34 +423,28 @@ def redrawAll(app):
 
     # draw furniture overlays after background but before cats
     drawFurnitureOverlays(app)
-
     # draw cats that aren't being dragged first
     catsToDraw = [cat for cat in app.cats if not cat.isBeingDragged]
     for cat in catsToDraw:
         cat.draw(app)
-    
     # draw dragged cat on top
     if app.draggingCat:
         app.draggingCat.draw(app)
-    
     # selection indicator
     if app.selectedCat and not app.selectedCat.isBeingDragged:
         drawCircle(app.selectedCat.x, app.selectedCat.y, 55, fill=None, border='cadetBlue', borderWidth=4, opacity=30)
-    
     # draw away time popup
     if app.showAwayTime:
         boxWidth = 400
         boxHeight = 40
         x = app.width//2 - boxWidth//2
         y = 120
-        
         # draw popup background
         drawRect(x, y, boxWidth, boxHeight, fill='lightYellow', 
                 border='orange', borderWidth=3, opacity=85)
         level_text = app.absenceLevelText.capitalize()
         if level_text == "Active":
             level_text = "Just Arrived"
-        
         # draw message
         message = f"You were away for {app.awayTimeText} ({level_text} Absence)"
         drawLabel(message, app.width//2, y + boxHeight//2, 
@@ -420,7 +475,7 @@ def redrawAll(app):
                  size=16, fill='gray', font='monospace')
     
     controlsX = app.width - 40
-    controlsY = app.height - 70
+    controlsY = app.height - 90
     drawRect(controlsX - 200, controlsY - 55, 220, 135, fill='steelBlue', border='darkBlue', opacity=30)
     drawLabel("Extra Controls", controlsX - 90, controlsY - 40, size=18, bold=True, fill='white', font='monospace', align='center')
     drawLabel("R = Make Elwin Run", controlsX - 90, controlsY-5, size=14, fill='black', font='monospace', align='center')

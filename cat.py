@@ -230,34 +230,43 @@ class Cat:
 
     def updateAnimation(self):
         self.frameTimer += 1
-        # different animation speeds for different states
-        # this was mostly trial and error 
         currentState = self.getCurrentAnimationState()
-        if currentState == "dangling":
-            animationSpeed = 15  # moderate speed for dangling animation
-        elif currentState == "running":
-            animationSpeed = 5  # faster running 
-        elif currentState == "sleeping":
-            animationSpeed = 20  # slower for peaceful sleeping
-        elif currentState == "idle_happy":
-            animationSpeed = 8   # faster for happy/energetic cats
-        elif currentState == "sad":
-            animationSpeed = 5
-        else:
-            animationSpeed = self.animationSpeed  # normal-ish speed for neutral/sad
-            
+        # initialize previous state tracking if it doesn't exist
+        # hasattr from: https://www.w3schools.com/python/ref_func_hasattr.asp (this is where i learnt of its use)
+        if not hasattr(self, 'previousAnimationState'):
+            self.previousAnimationState = currentState
+            self.currentFrame = 0
+        # ALWAYS reset frame when state changes
+        if currentState != self.previousAnimationState:
+            self.currentFrame = 0
+            self.frameTimer = 0
+            self.previousAnimationState = currentState
+        # get max frames and ensure current frame is valid
+        maxFrames = self.spriteFrames.get(currentState, 1)
+        if self.currentFrame >= maxFrames:
+            self.currentFrame = 0
+        # set animation speeds
+        animationSpeeds = {
+            "dangling": 15,
+            "running": 5,
+            "sleeping": 20,
+            "idle_happy": 8,
+            "sad": 15,
+            "idle_neutral": 12
+        }
+        animationSpeed = animationSpeeds.get(currentState, self.animationSpeed)
+        # advance frame
         if self.frameTimer >= animationSpeed:
             self.frameTimer = 0
-            # get current animation state and frame count
-            maxFrames = self.spriteFrames.get(currentState, 1)
-            # cycle through frames
             self.currentFrame = (self.currentFrame + 1) % maxFrames
 
-    # initially was unsure how to handle getting sprites but was helped by students Josie Peller and Joshua Wang
+    # initially was unsure how to handle getting sprites but was helped by students Josie Peller and Joshua Wang (fellow students)
     def getSpritePath(self):
         currentState = self.getCurrentAnimationState()
         maxFrames = self.spriteFrames.get(currentState, 1)
-        
+        # clamp frame to valid range (prevents bug where frame counter was reset when switching animation states)
+        # idea to clamp came from Elwin Li (implementation was my own)
+        safeFrame = self.currentFrame % maxFrames
         # special handling for dangling - use happy frames 3-4 [?? have to double check number but it looks right]
         if currentState == "dangling":
             # map dangling frames 0-1 to happy frames 3-4 [??]
@@ -274,13 +283,31 @@ class Cat:
         return f"images/cats/{spriteFilename}"
 
     def updateStats(self, timeMultiplier=1):
-        self.hunger = max(0, self.hunger - (0.1 * self.personality['hungerRate'] * timeMultiplier))
-        self.energy = max(0, self.energy - (0.05 * self.personality['energyRate'] * timeMultiplier))
-        self.cleanliness = max(0, self.cleanliness - (0.03 * self.personality['messyRate'] * timeMultiplier))
+        # check if cat should start sleeping
+        if self.energy < 30 and not self.isSleeping and not self.isRunning:
+            self.isSleeping = True
+            self.activity = "sleeping"
+        # check if cat should wake up (well rested or very hungry)
+        elif self.isSleeping and (self.energy >= 80 or self.hunger <= 15):
+            self.isSleeping = False
+            self.activity = "idle"
+        # update stats based on sleep state
+        if self.isSleeping:
+            # while sleeping: restore energy, slow hunger drain
+            self.energy = min(100, self.energy + (0.9 * timeMultiplier))  # restore energy
+            self.hunger = max(0, self.hunger - (0.05 * self.personality['hungerRate'] * timeMultiplier))  # slower hunger
+            self.cleanliness = max(0, self.cleanliness - (0.01 * self.personality['messyRate'] * timeMultiplier))  # very slow mess
+        else:
+            # while awake: normal stat drain
+            self.hunger = max(0, self.hunger - (0.1 * self.personality['hungerRate'] * timeMultiplier))
+            self.energy = max(0, self.energy - (0.05 * self.personality['energyRate'] * timeMultiplier))
+            self.cleanliness = max(0, self.cleanliness - (0.03 * self.personality['messyRate'] * timeMultiplier))
+        # happiness changes based on overall care
         if self.hunger < 20 or self.energy < 20 or self.cleanliness < 20:
             self.happiness = max(0, self.happiness - (0.15 * self.personality['socialNeed'] * timeMultiplier))
         elif self.hunger > 80 and self.energy > 80 and self.cleanliness > 80:
             self.happiness = min(100, self.happiness + (0.05 * timeMultiplier))
+        # update mood based on average stats
         avgStat = (self.hunger + self.happiness + self.energy + self.cleanliness) / 4
         if avgStat > 70:
             self.mood = "happy"
@@ -288,14 +315,13 @@ class Cat:
             self.mood = "neutral"
         else:
             self.mood = "sad"
-        self.isSleeping = self.energy < 30
 
     def startAutonomousActivity(self, activity):
         self.activity = activity
         self.autonomousTimer = random.randint(60, 180)  # 2-6 seconds at 30fps
         
         if activity == "wandering":
-            # Move to a random valid location
+            # move to a random valid location
             attempts = 0
             while attempts < 10:
                 targetX = random.randint(300, 900)
@@ -307,20 +333,19 @@ class Cat:
                 attempts += 1
                 
         elif activity == "foraging":
-            # Slowly recover hunger
+            # slowly recover hunger
             self.hunger = min(100, self.hunger + 10)
             
         elif activity == "self-grooming":
-            # Improve cleanliness
+            # Iiprove cleanliness
             self.cleanliness = min(100, self.cleanliness + 15)
             
         elif activity == "playing":
-            # Boost happiness but use energy
+            # boost happiness but use energy
             self.happiness = min(100, self.happiness + 8)
             self.energy = max(0, self.energy - 5)
     
     def updateAutonomousBehavior(self):
-        """Update autonomous behavior timers"""
         if self.autonomousTimer > 0:
             self.autonomousTimer -= 1
             if self.autonomousTimer <= 0:
@@ -333,18 +358,20 @@ class Cat:
         self.updateRunning()  # add running behavior
         self.updateAutonomousBehavior()  # update autonomous behaviors
         spriteLoaded = False
-    
         # first we try the primary sprite system
+        # 
         if not spriteLoaded:
             try:
                 spritePath = self.getSpritePath()
                 drawImage(spritePath, self.x, self.y, align='center', width=80, height=80)
                 spriteLoaded = True
+            # this code/idea from: https://stackoverflow.com/questions/18982610/difference-between-except-and-except-exception-as-e 
+            # and: https://rollbar.com/blog/what-is-except-exception-as-e-in-python/ 
             except Exception as e:
                 pass
         # there were initially bugs with loading sprites so i asked claude (AI) 
         # "how can i trial a sprite path/show something else if my sprite has a bug"
-        # and i was recommended this try/except format and the rest was my own work
+        # so that is why i have so many try/except loops
         # first we try the primary sprite system
         if not spriteLoaded:
             try:
