@@ -87,6 +87,8 @@ A cozy and interactive Python-based simulation where you can care for cats with 
    ├── absence_tracker.py
    ├── furniture.py
    ├── last_active.txt [this will be created upon running the game for the first time]
+   ├── sounds/
+   │   ├── background_music.mp3
    ├── images/
    │   ├── basic_room2.png
    │   ├── cats/
