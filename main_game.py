@@ -266,10 +266,51 @@ def onMouseRelease(app, mouseX, mouseY):
     if app.draggingCat:
         dragDuration = app.stepCounter - app.dragStartTime
         if dragDuration >= 10:
-            app.draggingCat.x = max(100, min(app.width - 100, app.draggingCat.x))
-            app.draggingCat.y = max(100, min(app.height - 150, app.draggingCat.y))
+            # clamp to screen bounds
+            newX = max(100, min(app.width - 100, app.draggingCat.x))
+            newY = max(100, min(app.height - 150, app.draggingCat.y))
+            # check for collisions
+            isColliding, collidingCat = checkCatCollisions(app, app.draggingCat, newX, newY)
+            if isColliding:
+                print(f"{app.draggingCat.name} would collide with {collidingCat.name}!")
+                # find a safe position nearby
+                safeX, safeY = findSafePosition(app, app.draggingCat, newX, newY)
+                app.draggingCat.x = safeX
+                app.draggingCat.y = safeY
+                print(f"Moved {app.draggingCat.name} to safe position ({safeX:.0f}, {safeY:.0f})")
+            else:
+                app.draggingCat.x = newX
+                app.draggingCat.y = newY
         app.draggingCat.stopDrag()
         app.draggingCat = None
+
+def checkCatCollisions(app, draggedCat, newX, newY):
+    # check if a cat would collide with others at a new position
+    for otherCat in app.cats:
+        if otherCat == draggedCat:
+            continue
+        distance = ((newX - otherCat.x) ** 2 + (newY - otherCat.y) ** 2) ** 0.5
+        catRadius = 40
+        if distance < catRadius * 2:
+            return True, otherCat
+    return False, None
+
+def findSafePosition(app, cat, preferredX, preferredY):
+    # find a safe position near the preferred location
+    catRadius = 40
+    # try positions in a spiral pattern around preferred location
+    for radius in range(0, 200, 20):
+        for angle in range(0, 360, 30):
+            import math
+            testX = preferredX + radius * math.cos(math.radians(angle))
+            testY = preferredY + radius * math.sin(math.radians(angle))
+            # check if position is valid and doesn't collide
+            if isValidPosition(testX, testY):
+                isColliding, _ = checkCatCollisions(app, cat, testX, testY)
+                if not isColliding:
+                    return testX, testY
+    # fallback to last valid position
+    return cat.lastValidX, cat.lastValidY
 
 def onStep(app):
     app.stepCounter += 1
@@ -318,20 +359,17 @@ def onKeyPress(app, key):
                 print("Elwin is already running!")
         else:
             print("Could not find Elwin!")
-
     elif key == 'f':  # press 'F' to show furniture info in console
         # print-statement format inspired by the 112 gradebook
         print("=== FURNITURE STATUS ===")
         for furniture in app.furniture:
             # had to check CMU documentations for f-strings again for this 
-            print(f"{furniture.name}: variant {furniture.currentVariant}/{len(furniture.variants)-1} - {furniture.variants[furniture.currentVariant] if furniture.currentVariant > 0 else 'original'}")
-            
+            print(f"{furniture.name}: variant {furniture.currentVariant}/{len(furniture.variants)-1} - {furniture.variants[furniture.currentVariant] if furniture.currentVariant > 0 else 'original'}")       
     elif key == 't':  # test absence system
         # print-statement format inspired by the 112 gradebook
         print("=== TESTING ABSENCE SYSTEM ===")
         print(f"Current absence time: {app.absenceTracker.formatTime(app.absenceTracker.getAbsenceTime())}")
         print(f"Absence level: {app.absenceTracker.getAbsenceLevel()}")
-        
         # reset to current time first, then simulate absence
         app.absenceTracker.lastActiveTime = time.time() - 3600  # set to exactly 1 hour ago
         app.absenceTracker.isActive = True  # reset active state
@@ -340,18 +378,14 @@ def onKeyPress(app, key):
     elif key == 'z':  # press 'Z' to debug timestamps
         # print-statement format inspired by the 112 gradebook
         print("=== TIMESTAMP DEBUG ===")
-        
         current_time = time.time()
         print(f"Current time.time(): {current_time}")
         print(f"Current readable: {time.ctime(current_time)}")
-        
         saved_time = app.absenceTracker.lastActiveTime
         print(f"Saved time: {saved_time}")
         print(f"Saved readable: {time.ctime(saved_time)}")
-        
         difference = current_time - saved_time
         print(f"Difference: {difference:.1f} seconds")
-        
         # check file contents
         # i got this from: https://stackoverflow.com/questions/28737292/how-to-check-text-file-exists-and-is-not-empty-in-python
         if os.path.exists("last_active.txt"):
@@ -361,7 +395,6 @@ def onKeyPress(app, key):
             if content:
                 file_time = float(content)
                 print(f"File time readable: {time.ctime(file_time)}")
-        
         # force reset timestamp
         # recommended for debugging by Claude (AI)
         # prompt: what format can i use to create a forced reset on my time text file in python
@@ -369,13 +402,10 @@ def onKeyPress(app, key):
         app.absenceTracker.lastActiveTime = current_time
         app.absenceTracker.saveActivityData()
         print("Timestamp reset!")
-
     elif key == 'y':  # press 'Y' to manually test absence popup
         print("=== MANUAL ABSENCE TEST ===")
-        
         # set timestamp to 2 minutes ago
         fake_time = time.time() - 120  # 2 minutes ago
-        
         # write directly to file
         # asked Claude how to write directly into a file because i was unsure
         # prompt: "what are ways to directly replace something in a python text file"
@@ -391,22 +421,19 @@ def onKeyPress(app, key):
             app.awayTimeText = app.absenceTracker.formatTime(absenceTime)
             app.absenceLevelText = app.absenceTracker.getAbsenceLevel()
             app.showAwayTime = True
-            app.awayTimeTimer = 900  # show for 30 seconds
+            app.awayTimeTimer = 600  # show for 20 seconds
             print("Popup should now be visible!")
             print(f"Timer set to: {app.awayTimeTimer}")
         else:
             print("Absence time too short for popup")
-
     # force popup test key:
     elif key == 'p':  # press 'P' to force show popup
         print("=== FORCE POPUP TEST ===")
-        
         # force set all popup variables
         app.awayTimeText = "2 minutes"
         app.absenceLevelText = "short"
         app.showAwayTime = True
         app.awayTimeTimer = 900  # show for 30 seconds
-        
         print(f"Set popup variables:")
         print(f"  awayTimeText: '{app.awayTimeText}'")
         print(f"  absenceLevelText: '{app.absenceLevelText}'")
