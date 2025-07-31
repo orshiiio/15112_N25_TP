@@ -178,6 +178,7 @@ This project is licensed under the MIT License. See the [LICENSE] file for detai
 - Inspired by cozy simulation games like *Neko Atsume* and *Tamagotchi*
 - Kaomoji emoticons from emojicombos.com
 - Sprites from artist ToffeeCraft
-- Music from artist Mage Tears
-- Dedicated to my friends who share my love of cats 🐾
-- Thank you to Elwin Li [@ebeetles] (https://www.github.com/ebeetles) who helped me create a format for this README and motivated me throughout this project 
+- Music from artist Mage Tears🐈‍
+- Dedicated to my friends who share my love of cats 🐾🐈‍⬛
+- Thank you to my TAs (Alex, Nathan & Yudh), Head TAs (Elena & Ryan) and Prof. Mike Taylor for their help
+- Special thank you to Elwin Li [@ebeetles] (https://www.github.com/ebeetles) who helped me create a format for this README and motivated me throughout this project 
